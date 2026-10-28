@@ -11,7 +11,7 @@ Report privately through one of:
 
 1. **GitHub Private Vulnerability Reporting** (preferred) — go to the
    repository's **Security** tab and choose **Report a vulnerability**.
-2. **Email** — security@signalare.se
+2. **Email** — <security@signalare.se>
 
 Please include:
 

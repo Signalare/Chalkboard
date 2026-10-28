@@ -72,7 +72,7 @@ Every requirement has a stable ID (`AREA-NNN`). IDs are never reused or renumber
 
 ## 3. System overview
 
-```
+```text
              ┌──────────────── Venue LAN (Wi-Fi) or Cluster AP ────────────────┐
              │                                                                  │
    Browser ──┼──► https://chalkboard.local  (any node serves the same web app)  │
@@ -255,7 +255,7 @@ All replicated entities are **records** (§11.3). Prices are stored as integers 
 | DATA-008 | Page bindings MUST support selecting by category, tag, explicit item list and combinations thereof, filtered by the active daypart. |
 | DATA-009 | The total blob store SHOULD be capped (default 1 GB) with a visible usage indicator in the web app. |
 | DATA-010 | The cluster MUST have exactly one pricing currency. All stored amounts are in that currency. |
-| DATA-011 | An OPTIONAL secondary display currency MUST be supported: amounts are converted at an admin-set fixed rate with a configurable rounding rule (e.g. nearest 0.50), and are display-only. Templates MUST be able to show it via the `price` node (e.g. `{{item.prices.L | secondary}}`). Changing the rate MUST go through the publish workflow. |
+| DATA-011 | An OPTIONAL secondary display currency MUST be supported: amounts are converted at an admin-set fixed rate with a configurable rounding rule (e.g. nearest 0.50), and are display-only. Templates MUST be able to show it via the `price` node (e.g. `{{item.prices.L \| secondary}}`). Changing the rate MUST go through the publish workflow. |
 
 ---
 

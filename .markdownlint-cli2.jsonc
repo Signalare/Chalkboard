@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+{
+  "config": {
+    "default": true,
+    // Long lines are fine: tables and requirement text in SPEC.md are wide.
+    "MD013": false,
+    // Keep a Changelog repeats "### Added" etc. under each release.
+    "MD024": { "siblings_only": true },
+    // The pull request template starts with a level-2 heading.
+    "MD041": false,
+    // Tables use the compact `|---|---|` delimiter style throughout.
+    "MD060": false
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "**/node_modules/**",
+    "**/target/**",
+    "**/build/**",
+    "**/dist/**",
+    // Upstream text kept verbatim.
+    "CODE_OF_CONDUCT.md"
+  ]
+}

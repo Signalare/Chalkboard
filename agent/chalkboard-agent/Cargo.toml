@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+[package]
+name = "chalkboard-agent"
+description = "Chalkboard node agent: discovery, sync, web app, HDMI-CEC, time and updates"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
