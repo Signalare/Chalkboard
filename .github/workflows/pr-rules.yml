@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Enforces the pull request rules from CONTRIBUTING.md: a Conventional Commit
+# title (it becomes the squash commit message) and a changelog entry unless
+# the pull request is labelled `skip-changelog`.
+
+name: PR rules
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-rules-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    name: PR title
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The title is passed through the environment, never interpolated into
+      # the script, so it cannot inject shell commands.
+      - name: Check PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: tools/check-pr-title.sh "$TITLE"
+
+  changelog:
+    name: Changelog
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check CHANGELOG.md
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SKIP_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'skip-changelog') }}
+        run: tools/check-changelog.sh "$BASE_SHA"

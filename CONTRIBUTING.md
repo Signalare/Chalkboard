@@ -173,7 +173,7 @@ installed with `just install-hooks`.
 Prerequisites for `just check`:
 
 - [rustup](https://rustup.rs/) (the toolchain version is pinned in
-  `agent/rust-toolchain.toml`)
+  `rust-toolchain.toml`)
 - CMake ≥ 3.20 and a C11 compiler
 - LLVM's `clang-format` and `clang-tidy` (macOS: `brew install llvm`)
 - `shellcheck`
