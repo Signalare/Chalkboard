@@ -170,6 +170,20 @@ just check
 `just fmt` applies all formatters. An optional pre-commit hook can be
 installed with `just install-hooks`.
 
+Prerequisites for `just check`:
+
+- [rustup](https://rustup.rs/) (the toolchain version is pinned in
+  `agent/rust-toolchain.toml`)
+- CMake ≥ 3.20 and a C11 compiler
+- LLVM's `clang-format` and `clang-tidy` (macOS: `brew install llvm`)
+- `shellcheck`
+- Node.js with [pnpm](https://pnpm.io/) (version pinned in `package.json`);
+  JavaScript tools, including markdownlint, are installed from the lockfile
+- [`just`](https://github.com/casey/just)
+
+The repository layout is described in
+[ADR 0001](docs/adr/0001-monorepo-layout.md).
+
 Every source file must start with an SPDX license header, for example:
 
 ```rust
