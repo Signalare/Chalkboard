@@ -1,0 +1,61 @@
+# --- OS / editors ---
+.DS_Store
+._*
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.claude/settings.local.json
+
+# --- Rust (chalkboard-agent) ---
+target/
+**/*.rs.bk
+*.pdb
+
+# --- C (chalkboard-render) ---
+build/
+build-*/
+*.o
+*.a
+*.so
+compile_commands.json
+.cache/
+
+# --- Web app (Svelte) and WASM preview ---
+node_modules/
+dist/
+.svelte-kit/
+*.wasm
+!**/testdata/**/*.wasm
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# --- Buildroot / firmware images ---
+output/
+dl/
+*.img
+*.img.xz
+*.raucb
+*.squashfs
+
+# --- Secrets and local config (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+release-key*
+chalkboard-seed.json
+!**/examples/chalkboard-seed.json
+
+# --- Test artefacts ---
+coverage/
+*.profraw
+fuzz/artifacts/
+fuzz/corpus/
+tests/golden/**/*.actual.png

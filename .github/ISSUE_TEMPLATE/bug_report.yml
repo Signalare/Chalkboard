@@ -1,0 +1,90 @@
+name: Bug report
+description: Something doesn't work as specified or expected.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Security problems must be reported privately — see SECURITY.md.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Firmware version
+      description: Shown in the web app under About or on the health dashboard.
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected area
+      multiple: true
+      options:
+        - Rendering / templates
+        - Sync / cluster
+        - Wi-Fi / fallback AP / network
+        - HDMI-CEC / TV control
+        - Time / schedules
+        - Web app / API
+        - Provisioning / setup
+        - Updates
+        - Boot / OS image
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: board
+    attributes:
+      label: Board model(s) affected
+      description: See the support tiers in SPEC.md §4.1.
+      multiple: true
+      options:
+        - Pi Zero 2 W
+        - Pi 3B / 3B+ / 3A+
+        - Pi 4B
+        - Pi 400
+        - Pi 5
+        - Pi 500
+        - CM3 / CM3+ / CM4S
+        - CM4
+        - CM5
+    validations:
+      required: true
+  - type: input
+    id: nodes
+    attributes:
+      label: Number of nodes in the cluster
+      placeholder: "3"
+  - type: input
+    id: tv
+    attributes:
+      label: TV brand and model (if relevant)
+      placeholder: Samsung UE43AU7105
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Download logs from the health dashboard and attach or paste the relevant part.
+      render: text
+  - type: input
+    id: requirements
+    attributes:
+      label: Related requirement IDs (optional)
+      placeholder: SYNC-011, CEC-007

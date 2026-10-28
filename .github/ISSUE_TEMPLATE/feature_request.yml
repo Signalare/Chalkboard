@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest new behaviour or an improvement.
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Features need an **accepted** issue before a pull request — see CONTRIBUTING.md.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what makes it hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: Describe how it should work from the user's point of view.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: input
+    id: requirements
+    attributes:
+      label: Affected requirement IDs
+      description: Which SPEC.md requirements would this add to or change? Leave empty if unsure.
+      placeholder: TPL-006, WEB-005
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd like to implement this myself once it's accepted.

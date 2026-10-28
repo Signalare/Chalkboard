@@ -1,0 +1,37 @@
+name: Spec change
+description: Propose adding, changing or withdrawing requirements in SPEC.md.
+labels: ["spec", "triage"]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem does the current specification cause or miss?
+    validations:
+      required: true
+  - type: textarea
+    id: changes
+    attributes:
+      label: Proposed requirement changes
+      description: List each requirement to add, change or withdraw, with the proposed wording.
+      placeholder: |
+        - Add CEC-012: …
+        - Change SYNC-011: 2 s → 1 s
+        - Withdraw WEB-002
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Spec version impact
+      options:
+        - PATCH — clarification only
+        - MINOR — adds requirements
+        - MAJOR — removes or changes requirements incompatibly
+    validations:
+      required: true
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: Effects on existing code, data, compatibility, performance budgets or the roadmap.

@@ -1,0 +1,60 @@
+name: TV/CEC compatibility report
+description: Tell us how Chalkboard's HDMI-CEC control works with your TV.
+labels: ["cec-compat"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports feed the CEC compatibility matrix (SPEC TEST-007). Working TVs are just as useful as broken ones!
+  - type: input
+    id: tv
+    attributes:
+      label: TV brand and model
+      description: The exact model number, usually on a sticker at the back.
+      placeholder: LG 43UQ75006LF
+    validations:
+      required: true
+  - type: input
+    id: tv-firmware
+    attributes:
+      label: TV firmware version (if known)
+  - type: input
+    id: board
+    attributes:
+      label: Raspberry Pi board and HDMI port
+      description: CEC behaviour can differ per board and, on dual-HDMI boards, per port.
+      placeholder: Pi 5, HDMI 0
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Chalkboard firmware version
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: cec-setting
+    attributes:
+      label: CEC setting name on the TV
+      description: Manufacturers brand CEC differently (Anynet+, SimpLink, Bravia Sync, …).
+      placeholder: SimpLink (HDMI-CEC) enabled
+  - type: checkboxes
+    id: features
+    attributes:
+      label: Working features
+      description: Tick everything that works reliably.
+      options:
+        - label: Power on (Image View On)
+        - label: Standby
+        - label: Switch input to the Pi (Active Source)
+        - label: Power status reporting
+        - label: Watchdog re-assert after input change
+        - label: Volume up/down
+        - label: Mute
+        - label: OSD name shown on the TV
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes and quirks
+      description: Delays, partial support, settings needed, or anything unusual. Attach the CEC capability report from the dashboard if available.
