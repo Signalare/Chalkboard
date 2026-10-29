@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "test",
+  "name": "Test",
+  "canvas": {
+    "width": 1920,
+    "height": 1080
+  },
+  "styles": {
+    "heading": {
+      "font": "Oswald",
+      "size": 40
+    },
+    "body": {
+      "font": "Inter",
+      "size": 30
+    }
+  },
+  "root": {
+    "type": "text",
+    "style": "body",
+    "text": "{{item.name}}",
+    "fit": {
+      "mode": "clip"
+    }
+  }
+}

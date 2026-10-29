@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Signalare/Chalkboard/schema/template.v1.json",
+  "title": "Chalkboard template v1",
+  "description": "Declarative screen template (SPEC §8). SPDX-License-Identifier: MIT OR Apache-2.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "canvas", "root"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "id": { "$ref": "#/$defs/identifier" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "description": { "type": "string", "maxLength": 1000 },
+    "canvas": { "$ref": "#/$defs/canvas" },
+    "fonts": {
+      "description": "Custom fonts from uploaded blobs, in addition to the shipped families (RND-013).",
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": { "$ref": "#/$defs/name" },
+      "additionalProperties": { "$ref": "#/$defs/fontFace" }
+    },
+    "styles": {
+      "type": "object",
+      "maxProperties": 128,
+      "propertyNames": { "$ref": "#/$defs/name" },
+      "additionalProperties": { "$ref": "#/$defs/style" }
+    },
+    "soldOut": { "$ref": "#/$defs/soldOut" },
+    "root": { "$ref": "#/$defs/node" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+    "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$" },
+    "length": { "type": "integer", "minimum": 0, "maximum": 8192 },
+    "color": { "type": "string", "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$" },
+    "blobRef": { "type": "string", "pattern": "^blob:[0-9a-f]{64}$" },
+
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 320, "maximum": 3840 },
+        "height": { "type": "integer", "minimum": 320, "maximum": 3840 },
+        "background": { "$ref": "#/$defs/color" }
+      }
+    },
+
+    "fontFace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src"],
+      "properties": { "src": { "$ref": "#/$defs/blobRef" } }
+    },
+
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "font": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "size": { "type": "integer", "minimum": 6, "maximum": 1000 },
+        "weight": { "enum": [300, 400, 500, 600, 700, 800, 900] },
+        "italic": { "type": "boolean" },
+        "color": { "$ref": "#/$defs/color" },
+        "background": { "$ref": "#/$defs/color" },
+        "align": { "enum": ["start", "center", "end"] },
+        "lineHeight": { "type": "number", "minimum": 0.5, "maximum": 3 },
+        "letterSpacing": { "type": "integer", "minimum": -50, "maximum": 200 },
+        "padding": { "$ref": "#/$defs/spacing" },
+        "radius": { "$ref": "#/$defs/length" },
+        "borderWidth": { "$ref": "#/$defs/length" },
+        "borderColor": { "$ref": "#/$defs/color" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+
+    "spacing": {
+      "description": "Uniform, [vertical, horizontal] or [top, right, bottom, left].",
+      "oneOf": [
+        { "$ref": "#/$defs/length" },
+        { "type": "array", "items": { "$ref": "#/$defs/length" }, "minItems": 2, "maxItems": 2 },
+        { "type": "array", "items": { "$ref": "#/$defs/length" }, "minItems": 4, "maxItems": 4 }
+      ]
+    },
+
+    "soldOut": {
+      "description": "How sold-out items are shown (TPL-008).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "enum": ["hide", "dim", "badge"] },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "badgeText": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "badgeStyle": { "$ref": "#/$defs/styleRef" }
+      }
+    },
+
+    "styleRef": {
+      "oneOf": [
+        { "$ref": "#/$defs/name" },
+        { "type": "array", "items": { "$ref": "#/$defs/name" }, "minItems": 1, "maxItems": 8 }
+      ]
+    },
+
+    "dimension": {
+      "description": "Logical pixels, the content's natural size, or all remaining space.",
+      "oneOf": [{ "$ref": "#/$defs/length" }, { "enum": ["content", "fill"] }]
+    },
+
+    "track": {
+      "description": "Grid track: logical pixels, \"content\", or a fraction such as \"1fr\".",
+      "oneOf": [
+        { "$ref": "#/$defs/length" },
+        { "const": "content" },
+        { "type": "string", "pattern": "^[1-9][0-9]?fr$" }
+      ]
+    },
+
+    "layout": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "flex" },
+            "direction": { "enum": ["row", "column"] },
+            "wrap": { "type": "boolean" },
+            "gap": { "$ref": "#/$defs/length" },
+            "justify": { "enum": ["start", "center", "end", "space-between", "space-around", "space-evenly"] },
+            "align": { "enum": ["start", "center", "end", "stretch"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "columns", "rows"],
+          "properties": {
+            "type": { "const": "grid" },
+            "columns": { "type": "array", "items": { "$ref": "#/$defs/track" }, "minItems": 1, "maxItems": 24 },
+            "rows": { "type": "array", "items": { "$ref": "#/$defs/track" }, "minItems": 1, "maxItems": 24 },
+            "columnGap": { "$ref": "#/$defs/length" },
+            "rowGap": { "$ref": "#/$defs/length" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "absolute" } }
+        }
+      ]
+    },
+
+    "nodeCommon": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/name" },
+        "style": { "$ref": "#/$defs/styleRef" },
+        "width": { "$ref": "#/$defs/dimension" },
+        "height": { "$ref": "#/$defs/dimension" },
+        "grow": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "x": { "$ref": "#/$defs/length" },
+        "y": { "$ref": "#/$defs/length" },
+        "cell": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["column", "row"],
+          "properties": {
+            "column": { "type": "integer", "minimum": 0, "maximum": 23 },
+            "row": { "type": "integer", "minimum": 0, "maximum": 23 },
+            "columnSpan": { "type": "integer", "minimum": 1, "maximum": 24 },
+            "rowSpan": { "type": "integer", "minimum": 1, "maximum": 24 }
+          }
+        }
+      }
+    },
+
+    "node": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["container", "text", "price", "image", "shape", "repeater", "conditional"] }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "container" } } }, "then": { "$ref": "#/$defs/container" } },
+        { "if": { "properties": { "type": { "const": "text" } } }, "then": { "$ref": "#/$defs/text" } },
+        { "if": { "properties": { "type": { "const": "price" } } }, "then": { "$ref": "#/$defs/price" } },
+        { "if": { "properties": { "type": { "const": "image" } } }, "then": { "$ref": "#/$defs/image" } },
+        { "if": { "properties": { "type": { "const": "shape" } } }, "then": { "$ref": "#/$defs/shape" } },
+        { "if": { "properties": { "type": { "const": "repeater" } } }, "then": { "$ref": "#/$defs/repeater" } },
+        { "if": { "properties": { "type": { "const": "conditional" } } }, "then": { "$ref": "#/$defs/conditional" } }
+      ]
+    },
+
+    "container": {
+      "$ref": "#/$defs/nodeCommon",
+      "unevaluatedProperties": false,
+      "properties": {
+        "type": { "const": "container" },
+        "layout": { "$ref": "#/$defs/layout" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" }, "maxItems": 200 }
+      }
+    },
+
+    "fit": {
+      "description": "What happens when text does not fit its box.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "maxLines"],
+          "properties": { "mode": { "const": "wrap" }, "maxLines": { "type": "integer", "minimum": 1, "maximum": 20 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "minSize"],
+          "properties": { "mode": { "const": "shrink" }, "minSize": { "type": "integer", "minimum": 6, "maximum": 1000 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": { "mode": { "const": "clip" } }
+        }
+      ]
+    },
+
+    "text": {
+      "$ref": "#/$defs/nodeCommon",
+      "unevaluatedProperties": false,
+      "required": ["text", "fit"],
+      "properties": {
+        "type": { "const": "text" },
+        "text": { "type": "string", "maxLength": 2000 },
+        "fit": { "$ref": "#/$defs/fit" }
+      }
+    },
+
+    "price": {
+      "description": "A price, always shrunk rather than cut off (TPL-004, DATA-011).",
+      "$ref": "#/$defs/nodeCommon",
+      "unevaluatedProperties": false,
+      "required": ["value", "minSize"],
+      "properties": {
+        "type": { "const": "price" },
+        "value": { "type": "string", "pattern": "^item\\.(price|prices\\.[A-Za-z0-9_-]{1,32})$" },
+        "currency": { "enum": ["primary", "secondary"] },
+        "minSize": { "type": "integer", "minimum": 6, "maximum": 1000 }
+      }
+    },
+
+    "image": {
+      "$ref": "#/$defs/nodeCommon",
+      "unevaluatedProperties": false,
+      "required": ["src", "width", "height"],
+      "properties": {
+        "type": { "const": "image" },
+        "src": {
+          "description": "A blob reference or a binding to an image field.",
+          "oneOf": [
+            { "$ref": "#/$defs/blobRef" },
+            { "type": "string", "pattern": "^\\{\\{ *(item|category)\\.image *\\}\\}$" }
+          ]
+        },
+        "scale": { "enum": ["cover", "contain", "stretch"] }
+      }
+    },
+
+    "shape": {
+      "$ref": "#/$defs/nodeCommon",
+      "unevaluatedProperties": false,
+      "required": ["shape", "width", "height"],
+      "properties": {
+        "type": { "const": "shape" },
+        "shape": { "enum": ["rect", "ellipse", "line"] }
+      }
+    },
+
+    "repeater": {
+      "description": "Repeats its template for each entry of the page binding (TPL-005, TPL-006).",
+      "$ref": "#/$defs/nodeCommon",
+      "unevaluatedProperties": false,
+      "required": ["source", "capacity", "template"],
+      "properties": {
+        "type": { "const": "repeater" },
+        "source": { "enum": ["items", "categories", "category.items"] },
+        "capacity": { "type": "integer", "minimum": 1, "maximum": 200 },
+        "sort": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["by"],
+          "properties": {
+            "by": { "enum": ["order", "name", "price"] },
+            "direction": { "enum": ["asc", "desc"] }
+          }
+        },
+        "layout": { "$ref": "#/$defs/layout" },
+        "template": { "$ref": "#/$defs/node" },
+        "empty": { "$ref": "#/$defs/node" }
+      }
+    },
+
+    "condition": {
+      "description": "TPL-007. Exactly one key per condition object.",
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "soldOut": { "type": "boolean" },
+        "hasImage": { "type": "boolean" },
+        "hasDescription": { "type": "boolean" },
+        "hasTag": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "hasBadge": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "hasVariant": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,32}$" },
+        "language": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+        "not": { "$ref": "#/$defs/condition" },
+        "all": { "type": "array", "items": { "$ref": "#/$defs/condition" }, "minItems": 1, "maxItems": 16 },
+        "any": { "type": "array", "items": { "$ref": "#/$defs/condition" }, "minItems": 1, "maxItems": 16 }
+      }
+    },
+
+    "conditional": {
+      "$ref": "#/$defs/nodeCommon",
+      "unevaluatedProperties": false,
+      "required": ["when", "then"],
+      "properties": {
+        "type": { "const": "conditional" },
+        "when": { "$ref": "#/$defs/condition" },
+        "then": { "$ref": "#/$defs/node" },
+        "else": { "$ref": "#/$defs/node" }
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "test",
+  "name": "Test",
+  "canvas": {
+    "width": 1920,
+    "height": 1080
+  },
+  "styles": {
+    "heading": {
+      "font": "Oswald",
+      "size": 40
+    },
+    "body": {
+      "font": "Inter",
+      "size": 30
+    }
+  },
+  "root": {
+    "type": "repeater",
+    "source": "category.items",
+    "capacity": 4,
+    "template": {
+      "type": "container",
+      "children": [
+        {
+          "type": "text",
+          "style": "body",
+          "text": "{{item.name}}",
+          "fit": {
+            "mode": "clip"
+          }
+        },
+        {
+          "type": "price",
+          "style": "body",
+          "value": "item.price",
+          "minSize": 20
+        }
+      ]
+    }
+  }
+}

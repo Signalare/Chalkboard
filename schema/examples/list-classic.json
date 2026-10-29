@@ -1,0 +1,65 @@
+{
+  "$schema": "../template.v1.json",
+  "schemaVersion": 1,
+  "id": "list-classic",
+  "name": "Classic list",
+  "description": "Categories as headings, each with its items, names left and prices right.",
+  "canvas": { "width": 1920, "height": 1080, "background": "#14110f" },
+  "styles": {
+    "page": { "padding": [72, 96] },
+    "heading": { "font": "Oswald", "size": 64, "weight": 600, "color": "#f2c14e", "letterSpacing": 40 },
+    "name": { "font": "Inter", "size": 40, "weight": 500, "color": "#f5f1ea" },
+    "description": { "font": "Inter", "size": 26, "color": "#b9b1a5" },
+    "price": { "font": "Inter", "size": 40, "weight": 600, "color": "#f5f1ea", "align": "end" },
+    "soldOutBadge": { "font": "Inter", "size": 22, "weight": 700, "color": "#14110f", "background": "#f2c14e", "padding": [4, 12], "radius": 6 }
+  },
+  "soldOut": { "mode": "badge", "badgeText": "Slut", "badgeStyle": "soldOutBadge" },
+  "root": {
+    "type": "repeater",
+    "style": "page",
+    "width": "fill",
+    "height": "fill",
+    "source": "categories",
+    "capacity": 2,
+    "sort": { "by": "order" },
+    "layout": { "type": "flex", "direction": "row", "gap": 96 },
+    "template": {
+      "type": "container",
+      "grow": 1,
+      "height": "fill",
+      "layout": { "type": "flex", "direction": "column", "gap": 28 },
+      "children": [
+        { "type": "text", "style": "heading", "text": "{{category.title | upper}}", "fit": { "mode": "shrink", "minSize": 40 } },
+        {
+          "type": "repeater",
+          "source": "category.items",
+          "capacity": 8,
+          "sort": { "by": "order" },
+          "width": "fill",
+          "layout": { "type": "flex", "direction": "column", "gap": 20 },
+          "template": {
+            "type": "container",
+            "width": "fill",
+            "layout": { "type": "flex", "direction": "row", "gap": 24, "align": "start" },
+            "children": [
+              {
+                "type": "container",
+                "grow": 1,
+                "layout": { "type": "flex", "direction": "column", "gap": 4 },
+                "children": [
+                  { "type": "text", "style": "name", "text": "{{item.name}}", "width": "fill", "fit": { "mode": "wrap", "maxLines": 2 } },
+                  {
+                    "type": "conditional",
+                    "when": { "hasDescription": true },
+                    "then": { "type": "text", "style": "description", "text": "{{item.description}}", "width": "fill", "fit": { "mode": "wrap", "maxLines": 2 } }
+                  }
+                ]
+              },
+              { "type": "price", "style": "price", "value": "item.price", "minSize": 28 }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Fuzzing for the template parser (TPL-011). Needs nightly Rust and
+# cargo-fuzz: `just fuzz-template`. Not part of the agent workspace.
+
+[package]
+name = "chalkboard-template-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+chalkboard-template = { path = ".." }
+
+[[bin]]
+name = "validate"
+path = "fuzz_targets/validate.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

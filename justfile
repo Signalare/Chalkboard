@@ -70,6 +70,12 @@ check-web: install-web
 install-web:
     pnpm install --frozen-lockfile --silent
 
+# Fuzz the template parser (TPL-011; needs nightly Rust and cargo-fuzz).
+fuzz-template seconds="60":
+    mkdir -p build/fuzz/template
+    cp schema/examples/*.json schema/tests/invalid/*.json build/fuzz/template/
+    cd agent/chalkboard-template && cargo +nightly fuzz run validate ../../build/fuzz/template -- -max_total_time={{seconds}}
+
 # Build the OS build container (Buildroot needs Linux).
 os-buildenv:
     docker build -q -t chalkboard-buildenv tools/buildenv

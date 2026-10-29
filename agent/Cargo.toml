@@ -2,7 +2,8 @@
 
 [workspace]
 resolver = "3"
-members = ["chalkboard-agent"]
+members = ["chalkboard-agent", "chalkboard-template"]
+exclude = ["chalkboard-template/fuzz"]
 
 [workspace.package]
 version = "0.0.0"

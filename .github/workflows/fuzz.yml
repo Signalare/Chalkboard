@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Fuzzes the template parser (TPL-011, SEC-009): briefly on pull requests that
+# touch it, and longer every week. Not a required check; a crash fails the
+# job and uploads the reproducing input.
+
+name: Fuzz
+
+on:
+  pull_request:
+    paths:
+      - agent/chalkboard-template/**
+      - schema/**
+      - .github/workflows/fuzz.yml
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  template:
+    name: Fuzz templates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SECONDS_TO_FUZZ: ${{ github.event_name == 'schedule' && '1800' || '120' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install nightly Rust and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo +nightly install cargo-fuzz --version 0.13.2 --locked
+
+      - name: Seed corpus from examples and invalid templates
+        run: |
+          mkdir -p build/fuzz/template
+          cp schema/examples/*.json schema/tests/invalid/*.json build/fuzz/template/
+
+      - name: Fuzz
+        working-directory: agent/chalkboard-template
+        run: cargo +nightly fuzz run validate ../../build/fuzz/template -- -max_total_time="$SECONDS_TO_FUZZ"
+
+      - name: Upload crash inputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-artifacts
+          path: agent/chalkboard-template/fuzz/artifacts/

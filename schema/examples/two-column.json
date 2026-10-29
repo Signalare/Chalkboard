@@ -1,0 +1,56 @@
+{
+  "$schema": "../template.v1.json",
+  "schemaVersion": 1,
+  "id": "two-column",
+  "name": "Two columns with sizes",
+  "description": "A page title and items in two columns, with small and large prices side by side.",
+  "canvas": { "width": 1920, "height": 1080, "background": "#0f1a14" },
+  "styles": {
+    "page": { "padding": [64, 96] },
+    "title": { "font": "Playfair Display", "size": 88, "weight": 700, "color": "#e9f0ea" },
+    "sizes": { "font": "Inter", "size": 24, "weight": 600, "color": "#8fb39b", "align": "end" },
+    "name": { "font": "Inter", "size": 38, "weight": 500, "color": "#e9f0ea" },
+    "price": { "font": "Inter", "size": 38, "weight": 600, "color": "#e9f0ea", "align": "end" }
+  },
+  "soldOut": { "mode": "dim", "opacity": 0.35 },
+  "root": {
+    "type": "container",
+    "style": "page",
+    "width": "fill",
+    "height": "fill",
+    "layout": { "type": "flex", "direction": "column", "gap": 40 },
+    "children": [
+      { "type": "text", "style": "title", "text": "{{page.title}}", "width": "fill", "fit": { "mode": "shrink", "minSize": 56 } },
+      {
+        "type": "repeater",
+        "source": "items",
+        "capacity": 16,
+        "sort": { "by": "order" },
+        "width": "fill",
+        "grow": 1,
+        "layout": { "type": "grid", "columns": ["1fr", "1fr"], "rows": ["1fr", "1fr", "1fr", "1fr", "1fr", "1fr", "1fr", "1fr"], "columnGap": 96, "rowGap": 12 },
+        "template": {
+          "type": "container",
+          "width": "fill",
+          "layout": { "type": "grid", "columns": ["1fr", 140, 140], "rows": ["content"], "columnGap": 16 },
+          "children": [
+            { "type": "text", "style": "name", "text": "{{item.name}}", "cell": { "column": 0, "row": 0 }, "fit": { "mode": "clip" } },
+            {
+              "type": "conditional",
+              "cell": { "column": 1, "row": 0 },
+              "when": { "hasVariant": "S" },
+              "then": { "type": "price", "style": "price", "value": "item.prices.S", "minSize": 24 }
+            },
+            {
+              "type": "conditional",
+              "cell": { "column": 2, "row": 0 },
+              "when": { "hasVariant": "L" },
+              "then": { "type": "price", "style": "price", "value": "item.prices.L", "minSize": 24 },
+              "else": { "type": "price", "style": "price", "value": "item.price", "minSize": 24 }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
