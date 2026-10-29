@@ -2,7 +2,7 @@
 
 [workspace]
 resolver = "3"
-members = ["chalkboard-agent", "chalkboard-template"]
+members = ["chalkboard-agent", "chalkboard-board", "chalkboard-template"]
 exclude = ["chalkboard-template/fuzz"]
 
 [workspace.package]

@@ -3,6 +3,8 @@
 //! `chalkboard-agent`: discovery, replication, HTTP API and web app, HDMI-CEC,
 //! time, provisioning and updates (SPEC §3).
 
+pub use chalkboard_board as board;
+
 fn main() {
     println!("{}", banner());
 }

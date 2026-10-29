@@ -17,5 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Template format v1 (`schema/template.v1.json`) with four starter templates,
   and the `cb-template validate` tool, which reports every problem with its
   exact location and suggests corrections for typos.
+- Automatic Raspberry Pi board and hardware capability detection at startup
+  (model, support tier, SoC family, RAM, HDMI outputs, Wi-Fi bands, Ethernet,
+  RTC, and boot device type), with clear rejection of unsupported boards.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
