@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+config BR2_PACKAGE_CB_SPIKE_TOOLS
+	bool "cb-spike-tools"
+	help
+	  Boot-slot spike tools (#3): cb-firstframe draws a first frame via
+	  DRM/KMS and prints a timing marker; cb-tryboot, cb-slot and
+	  cb-commit exercise the A/B slot mechanisms.

@@ -1,0 +1,60 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# LAB TOOL ONLY — overwrites the whole SD card with an image streamed over
+# HTTP, verifies its SHA-256 on the card, and reboots. Everything it needs is
+# copied into RAM first and run in a chroot there, because the card it runs
+# from is being overwritten. A broken transfer leaves an unbootable card that
+# has to be reflashed by hand.
+#
+# Usage: cb-reflash URL SHA256 SIZE
+
+set -eu
+
+url="$1"
+sha="$2"
+size="$3"
+root=/tmp/reflash
+
+case "$size" in *[!0-9]*|'') echo "cb-reflash: SIZE must be a number" >&2; exit 2 ;; esac
+[ "$size" -ge 1048576 ] || { echo "cb-reflash: SIZE below 1 MiB is not a disk image" >&2; exit 2; }
+
+trap '[ $? -eq 0 ] || echo "CB_REFLASH_FAILED (before writing; card untouched)"' EXIT
+
+# Never delete through a mount: a leftover proc mount from an earlier run
+# must go first, and anything still mounted below $root stops the script.
+umount "$root/proc" 2>/dev/null || true
+if grep -q " $root/" /proc/mounts; then
+  echo "cb-reflash: something is still mounted under $root" >&2
+  exit 1
+fi
+rm -rf "$root"
+mkdir -p "$root/bin" "$root/lib" "$root/dev" "$root/proc"
+cp /bin/busybox "$root/bin/"
+# Only what BusyBox needs; /tmp is small.
+for lib in ld-linux-aarch64.so.1 libc.so.6 libm.so.6 libresolv.so.2; do
+  cp -L "/lib/$lib" "$root/lib/"
+done
+if [ -e /lib64 ]; then ln -s lib "$root/lib64"; fi
+# Private device nodes instead of mounting the shared devtmpfs, which a later
+# rm -rf could empty for the whole system.
+mknod "$root/dev/mmcblk0" b "$(cut -d: -f1 /sys/block/mmcblk0/dev)" "$(cut -d: -f2 /sys/block/mmcblk0/dev)"
+mknod "$root/dev/null" c 1 3
+mount -t proc proc "$root/proc"
+
+echo "CB_REFLASH_START size=$size"
+# shellcheck disable=SC2016 # expanded by the shell inside the chroot
+exec chroot "$root" /bin/busybox sh -c '
+  bb=/bin/busybox
+  $bb wget -q -T 30 -O - "$1" | $bb dd of=/dev/mmcblk0 bs=4M 2>/dev/null
+  $bb sync
+  echo 3 > /proc/sys/vm/drop_caches
+  got=$($bb head -c "$3" /dev/mmcblk0 | $bb sha256sum | $bb cut -d" " -f1)
+  if [ "$got" = "$2" ]; then
+    echo "CB_REFLASH_OK sha256=$got"
+    $bb sleep 1
+    echo b > /proc/sysrq-trigger
+  else
+    echo "CB_REFLASH_BAD expected=$2 got=$got"
+  fi
+' sh "$url" "$sha" "$size"

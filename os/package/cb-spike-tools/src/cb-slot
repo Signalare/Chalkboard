@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Prints the running slot, the image layout and whether this is a tryboot.
+
+arg() { tr ' ' '\n' < /proc/cmdline | sed -n "s/^$1=//p"; }
+
+dt_u32() {
+  if [ -r "$1" ]; then
+    od -An -tu1 "$1" | awk '{ v = 0; for (i = 1; i <= NF; i++) v = v * 256 + $i; print v }'
+  else
+    echo "n/a"
+  fi
+}
+
+bl=/proc/device-tree/chosen/bootloader
+built="$(dt_u32 $bl/build-timestamp)"
+[ "$built" != "n/a" ] && built="$(date -u -d "@$built" +%Y-%m-%d 2>/dev/null || echo "$built")"
+echo "slot=$(arg cb.slot) layout=$(arg cb.layout) tryboot=$(dt_u32 $bl/tryboot) boot_partition=$(dt_u32 $bl/partition) bootloader_built=$built"

@@ -1,0 +1,15 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Prints the byte offset (within FILE) of the character that follows each
+# occurrence of PATTERN, one per line. Exits non-zero if PATTERN is missing.
+# BusyBox grep has no -b, so the offsets are computed with awk.
+#
+# Usage: cb-slot-offsets FILE PATTERN
+
+set -eu
+
+awk -v pat="$2" '
+  { i = index($0, pat); if (i) { print off + i - 1 + length(pat); found = 1 }; off += length($0) + 1 }
+  END { exit found ? 0 : 1 }
+' "$1"

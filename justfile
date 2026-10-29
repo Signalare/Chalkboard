@@ -9,6 +9,12 @@ export PATH := "/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:" + env("PATH
 
 render_build := "build/render"
 
+# Lab Wi-Fi credentials for spike images (SSID=, PSK=, COUNTRY=); kept outside
+# the repository and mounted read-only into the build container only if present.
+lab_wifi := env("HOME") + "/.config/signalare/chalkboard-lab-wifi.env"
+os_docker := "docker run --rm -v chalkboard-os:/build -v \"$PWD\":/src:ro -v \"$PWD/build/os\":/out " + \
+    "$( [ -r " + lab_wifi + " ] && echo -v " + lab_wifi + ":/secrets/wifi.env:ro ) chalkboard-buildenv"
+
 # List available recipes.
 default:
     @just --list
@@ -63,6 +69,22 @@ check-web: install-web
 # Install JavaScript dependencies exactly as locked.
 install-web:
     pnpm install --frozen-lockfile --silent
+
+# Build the OS build container (Buildroot needs Linux).
+os-buildenv:
+    docker build -q -t chalkboard-buildenv tools/buildenv
+
+# Build an OS image from os/configs/<defconfig>; images land in build/os/.
+# Pass a Buildroot target to run it first, e.g. `just os-build spike_rpi4_defconfig cb-spike-tools-rebuild`
+# (Buildroot does not notice source changes in local packages).
+os-build defconfig="spike_rpi4_defconfig" target="": os-buildenv
+    mkdir -p build/os
+    {{ if target != "" { os_docker + " /src/tools/buildenv/build.sh " + defconfig + " " + target } else { "true" } }}
+    {{os_docker}} /src/tools/buildenv/build.sh {{defconfig}}
+
+# Open a shell in the OS build container (Buildroot tree in /build).
+os-shell: os-buildenv
+    docker run --rm -it -v chalkboard-os:/build -v "$PWD":/src:ro -v "$PWD/build/os":/out chalkboard-buildenv bash
 
 # Remove build outputs.
 clean:

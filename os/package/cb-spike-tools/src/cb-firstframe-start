@@ -1,0 +1,8 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# First sysinit action: start cb-firstframe in the background so it keeps
+# the frame on screen while init continues. The KMS driver is built in.
+
+echo "CB_INIT_START boottime_ms=$(cut -d' ' -f1 /proc/uptime | tr -d .)0"
+/usr/sbin/cb-firstframe &
