@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+config BR2_PACKAGE_CB_RPI_EEPROM
+	bool "cb-rpi-eeprom"
+	help
+	  Raspberry Pi 4 EEPROM bootloader update (OS-011): the official
+	  bootloader image from the rpi-eeprom "default" release channel with
+	  a Chalkboard bootloader configuration embedded, plus the official
+	  recovery.bin that flashes it from the boot partition.
+
+if BR2_PACKAGE_CB_RPI_EEPROM
+
+config BR2_PACKAGE_CB_RPI_EEPROM_CONFIG_FILE
+	string "bootloader configuration file"
+	help
+	  Bootloader configuration (bootconf.txt syntax) to embed.
+
+endif

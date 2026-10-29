@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Built-in display driver: no module loading on the critical path (BOOT-004).
+CONFIG_DRM=y
+CONFIG_DRM_VC4=y
+CONFIG_SND=y
+CONFIG_SND_SOC=y

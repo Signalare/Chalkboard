@@ -1,0 +1,16 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Commits slot a and b alternately forever, so that a power cut lands in the
+# middle of a commit. After any cut the node must still boot a valid slot.
+
+set -eu
+
+n=0
+while :; do
+  for s in a b; do
+    n=$((n + 1))
+    /usr/sbin/cb-commit "$s" > /dev/null
+    echo "CB_COMMIT_LOOP n=$n slot=$s"
+  done
+done

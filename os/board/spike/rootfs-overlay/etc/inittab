@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# BusyBox init for the boot-slot spike: first frame before anything else.
+
+::sysinit:/bin/mount -t proc proc /proc
+::sysinit:/bin/mount -t sysfs sysfs /sys
+::sysinit:/usr/sbin/cb-firstframe-start
+::sysinit:/bin/mount -t tmpfs -o size=64m tmpfs /tmp
+::sysinit:/bin/mount -t tmpfs -o size=1m tmpfs /run
+# Lab Wi-Fi (only if configured at build time); after the boot marker.
+::sysinit:/usr/sbin/cb-network-start
+
+ttyAMA0::respawn:/sbin/getty -L -n -l /bin/sh ttyAMA0 115200 vt100
+
+::shutdown:/bin/sync
+::shutdown:/bin/umount -a -r

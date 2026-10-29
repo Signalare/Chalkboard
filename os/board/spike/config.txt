@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Pi 4B config for the boot-slot spike (#3). post-image.sh adds the
+# slot-selection lines (os_prefix) per image variant.
+
+[all]
+start_file=start4.elf
+fixup_file=fixup4.dat
+kernel=Image
+arm_64bit=1
+
+# Fast, quiet boot (BOOT-004, BOOT-007).
+boot_delay=0
+disable_splash=1
+disable_overscan=1
+
+# KMS display driver (DRM for the renderer, and later HDMI-CEC).
+dtoverlay=vc4-kms-v3d
+
+# PL011 UART on GPIO 14/15 as the serial console; the firmware prints its
+# own progress there too, which splits boot time into stages.
+enable_uart=1
+dtoverlay=miniuart-bt
+uart_2ndstage=1

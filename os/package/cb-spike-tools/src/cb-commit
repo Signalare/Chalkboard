@@ -1,0 +1,64 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Makes a slot the default boot slot (default: the running one). The commit
+# is one raw single-sector write of the slot character(s) through cb-rawpatch;
+# the boot partition is only ever mounted read-only, so FAT metadata is never
+# written and a power cut leaves either the old or the new slot selected.
+#
+# Every offset is checked to point at a valid slot character before writing,
+# and the result is read back afterwards.
+#
+# Usage: cb-commit [a|b]
+
+set -eu
+
+arg() { tr ' ' '\n' < /proc/cmdline | sed -n "s/^$1=//p"; }
+die() { echo "cb-commit: $*" >&2; exit 1; }
+
+# Prints the character at byte offset $2 of file $1.
+char_at() { dd if="$1" bs=1 skip="$2" count=1 2>/dev/null; }
+
+slot="${1:-$(arg cb.slot)}"
+layout="$(arg cb.layout)"
+dev=/dev/mmcblk0p1
+
+case "$slot" in
+  a) part=2 other_part=3 ;;
+  b) part=3 other_part=2 ;;
+  *) die "unknown slot '$slot'" ;;
+esac
+
+remount() { umount /boot 2>/dev/null || true; mount -t vfat -o ro "$dev" /boot; }
+remount
+trap 'umount /boot' EXIT
+
+case "$layout" in
+  osprefix)
+    file=/boot/config.txt
+    offs="$(cb-slot-offsets "$file" 'os_prefix=slot-')" || die "no os_prefix line in $file"
+    [ "$(echo "$offs" | wc -l)" -eq 1 ] || die "expected one os_prefix line, found: $offs"
+    case "$(char_at "$file" "$offs")" in a|b) ;; *) die "byte $offs of $file is not a slot" ;; esac
+    cb-rawpatch "$dev" "$file" "$offs" "$slot"
+    remount
+    [ "$(char_at "$file" "$offs")" = "$slot" ] || die "read-back mismatch"
+    ;;
+  autoboot)
+    file=/boot/autoboot.txt
+    offs="$(cb-slot-offsets "$file" 'boot_partition=')" || die "no boot_partition lines in $file"
+    [ "$(echo "$offs" | wc -l)" -eq 2 ] || die "expected two boot_partition lines, found: $offs"
+    first="$(echo "$offs" | sed -n 1p)"
+    second="$(echo "$offs" | sed -n 2p)"
+    for o in "$first" "$second"; do
+      case "$(char_at "$file" "$o")" in 2|3) ;; *) die "byte $o of $file is not a boot partition" ;; esac
+    done
+    cb-rawpatch "$dev" "$file" "$first" "$part" "$second" "$other_part"
+    remount
+    [ "$(char_at "$file" "$first")$(char_at "$file" "$second")" = "$part$other_part" ] || die "read-back mismatch"
+    ;;
+  *)
+    die "layout '$layout' has no second slot"
+    ;;
+esac
+
+echo "CB_COMMIT slot=$slot"

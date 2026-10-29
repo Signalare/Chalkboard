@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Pi 4B EEPROM bootloader configuration for the boot-slot spike (#3, OS-011).
+
+[all]
+# Log the bootloader's own steps on the serial console (spike only: printing
+# costs boot time, so production sets this to 0).
+BOOT_UART=1
+# microSD first, then USB mass storage, then restart (0xf41, read right to left).
+BOOT_ORDER=0xf41
+# No HDMI diagnostics screen and no network install prompt.
+DISABLE_HDMI=1
+NET_INSTALL_AT_POWER_ON=0
+WAKE_ON_GPIO=1
+POWER_OFF_ON_HALT=0
