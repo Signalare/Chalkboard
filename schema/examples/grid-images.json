@@ -1,0 +1,58 @@
+{
+  "$schema": "../template.v1.json",
+  "schemaVersion": 1,
+  "id": "grid-images",
+  "name": "Image grid",
+  "description": "Cards with a photo, name, badges and price, four per row.",
+  "canvas": { "width": 1920, "height": 1080, "background": "#fbf7f0" },
+  "styles": {
+    "page": { "padding": 56 },
+    "card": { "background": "#ffffff", "radius": 20, "padding": 20, "borderWidth": 1, "borderColor": "#e8e0d2" },
+    "name": { "font": "Inter", "size": 32, "weight": 600, "color": "#2a2420" },
+    "badge": { "font": "Inter", "size": 20, "weight": 700, "color": "#ffffff", "background": "#3a7d44", "padding": [4, 10], "radius": 999 },
+    "price": { "font": "Inter", "size": 36, "weight": 700, "color": "#2a2420" },
+    "secondary": { "font": "Inter", "size": 22, "color": "#8a8075" }
+  },
+  "soldOut": { "mode": "dim", "opacity": 0.4 },
+  "root": {
+    "type": "repeater",
+    "style": "page",
+    "width": "fill",
+    "height": "fill",
+    "source": "items",
+    "capacity": 8,
+    "sort": { "by": "order" },
+    "layout": { "type": "grid", "columns": ["1fr", "1fr", "1fr", "1fr"], "rows": ["1fr", "1fr"], "columnGap": 32, "rowGap": 32 },
+    "template": {
+      "type": "container",
+      "style": "card",
+      "width": "fill",
+      "height": "fill",
+      "layout": { "type": "flex", "direction": "column", "gap": 12 },
+      "children": [
+        {
+          "type": "conditional",
+          "when": { "hasImage": true },
+          "then": { "type": "image", "src": "{{item.image}}", "width": "fill", "height": 220, "scale": "cover" },
+          "else": { "type": "shape", "shape": "rect", "style": "card", "width": "fill", "height": 220 }
+        },
+        { "type": "text", "style": "name", "text": "{{item.name}}", "width": "fill", "fit": { "mode": "wrap", "maxLines": 2 } },
+        {
+          "type": "conditional",
+          "when": { "hasBadge": "vegan" },
+          "then": { "type": "text", "style": "badge", "text": "Vegan", "fit": { "mode": "clip" } }
+        },
+        {
+          "type": "container",
+          "width": "fill",
+          "layout": { "type": "flex", "direction": "row", "gap": 12, "align": "end" },
+          "children": [
+            { "type": "price", "style": "price", "value": "item.price", "minSize": 24 },
+            { "type": "price", "style": "secondary", "value": "item.price", "currency": "secondary", "minSize": 16 }
+          ]
+        }
+      ]
+    },
+    "empty": { "type": "text", "style": "name", "text": "{{page.title}}", "fit": { "mode": "clip" } }
+  }
+}

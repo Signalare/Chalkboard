@@ -1,0 +1,82 @@
+{
+  "unknown-field.json": {
+    "error": "unknown field `colour`",
+    "schemaRejects": true
+  },
+  "binding-typo.json": {
+    "error": "did you mean 'item.name'",
+    "schemaRejects": false
+  },
+  "item-outside-repeater.json": {
+    "error": "only available inside a repeater over items",
+    "schemaRejects": false
+  },
+  "price-outside-repeater.json": {
+    "error": "price is only available inside a repeater over items",
+    "schemaRejects": false
+  },
+  "unknown-style.json": {
+    "error": "unknown style 'headng' (did you mean 'heading'?)",
+    "schemaRejects": false
+  },
+  "unknown-font.json": {
+    "error": "unknown font 'Oswlad' (did you mean 'Oswald'?)",
+    "schemaRejects": false
+  },
+  "missing-fit.json": {
+    "error": "missing field `fit`",
+    "schemaRejects": true
+  },
+  "bad-color.json": {
+    "error": "is not a colour",
+    "schemaRejects": true
+  },
+  "xy-outside-absolute.json": {
+    "error": "x/y are only allowed inside an absolute layout",
+    "schemaRejects": false
+  },
+  "cell-out-of-grid.json": {
+    "error": "exceeds the grid's 2 columns",
+    "schemaRejects": false
+  },
+  "duplicate-id.json": {
+    "error": "duplicate id 'label'",
+    "schemaRejects": false
+  },
+  "condition-two-keys.json": {
+    "error": "exactly one key",
+    "schemaRejects": true
+  },
+  "badge-without-text.json": {
+    "error": "required when mode is 'badge'",
+    "schemaRejects": false
+  },
+  "category-items-without-category.json": {
+    "error": "'category.items' needs an enclosing repeater over categories",
+    "schemaRejects": false
+  },
+  "unterminated-binding.json": {
+    "error": "unterminated '{{'",
+    "schemaRejects": false
+  },
+  "min-size-larger-than-font.json": {
+    "error": "minSize 80 is larger than the font size 30",
+    "schemaRejects": false
+  },
+  "schema-version.json": {
+    "error": "unsupported schema version 2",
+    "schemaRejects": true
+  },
+  "image-content-size.json": {
+    "error": "use pixels or 'fill' for images",
+    "schemaRejects": false
+  },
+  "price-not-a-price.json": {
+    "error": "'item.name' is not a price",
+    "schemaRejects": true
+  },
+  "unknown-node-type.json": {
+    "error": "unknown variant `video`",
+    "schemaRejects": true
+  }
+}

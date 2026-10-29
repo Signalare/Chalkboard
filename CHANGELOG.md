@@ -14,5 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README, contribution guidelines, security policy, Code of Conduct, and
   GitHub issue and pull request templates.
 - Dual licensing under MIT OR Apache-2.0.
+- Template format v1 (`schema/template.v1.json`) with four starter templates,
+  and the `cb-template validate` tool, which reports every problem with its
+  exact location and suggests corrections for typos.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
