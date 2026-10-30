@@ -20,5 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic Raspberry Pi board and hardware capability detection at startup
   (model, support tier, SoC family, RAM, HDMI outputs, Wi-Fi bands, Ethernet,
   RTC, and boot device type), with clear rejection of unsupported boards.
+- `chalkboard-render` C11 renderer core and DRM/KMS backend with atomic
+  snapshot loading (`current`/`previous` fallback), pre-rendered image cache,
+  1080p60/720p60 surface pipeline, `0`/`90`/`180`/`270` degree rotation,
+  repeater auto-pagination, playlist and daypart schedule cycling, `cut`/`fade`/
+  `slide` transitions, live sold-out and announcement updates, screen identify
+  overlay, first-boot setup and neutral starting screens, and shipped OFL font
+  stack with tabular numerals and automatic glyph fallback.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
