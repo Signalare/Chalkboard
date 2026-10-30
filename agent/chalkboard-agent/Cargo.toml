@@ -9,5 +9,8 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[dependencies]
+chalkboard-board = { path = "../chalkboard-board" }
+
 [lints]
 workspace = true
