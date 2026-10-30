@@ -546,7 +546,11 @@ fn read_revision_code(
 ) -> Result<u32, BoardError> {
     let dt_rev_path = root.join("proc/device-tree/system/linux,revision");
     if let Ok(bytes) = fs::read(&dt_rev_path) {
-        if bytes.len() == 4 {
+        // In the Linux device tree, `system/linux,revision` is a single 4-byte
+        // big-endian `u32` cell. Guard against 4-character ASCII hex strings
+        // (e.g. `"000e"` in text fixtures) so they fall through to the hex
+        // text parser instead of being misread as raw binary bytes.
+        if bytes.len() == 4 && !bytes.iter().all(u8::is_ascii_hexdigit) {
             return Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]));
         }
         let text = String::from_utf8_lossy(&bytes);
@@ -620,6 +624,11 @@ fn detect_wifi_bands(root: &Path, model: BoardModel) -> WifiBands {
             }
         }
         BoardModel::Cm3 | BoardModel::Cm3Plus | BoardModel::Cm4S => {
+            // CM3, CM3+, and CM4S have no on-board radio; any `phy*` entry comes
+            // from an external USB or carrier-board adapter. Because sysfs only
+            // exposes `phy*` directory presence (not nl80211 band capabilities),
+            // `Band2_4Ghz` is a deliberate conservative default for Tier 3 so we
+            // never claim 5 GHz support that the adapter may not have.
             if phy_present == Some(true) {
                 WifiBands::Band2_4Ghz
             } else {
@@ -746,8 +755,26 @@ fn find_sys_block_device(root: &Path) -> Option<String> {
                 && !name.ends_with("rpmb")
         })
         .collect();
-    names.sort();
+    // Rank `/sys/block` fallback candidates by boot priority (`nvme*` > `sd*` >
+    // `mmcblk*`) before lexicographical tie-breaking so an inserted SD card
+    // (`mmcblk0`) does not shadow an NVMe or USB SSD boot drive when
+    // `/proc/mounts` is unavailable.
+    names.sort_by(|a, b| {
+        sys_block_priority(a)
+            .cmp(&sys_block_priority(b))
+            .then_with(|| a.cmp(b))
+    });
     names.into_iter().next()
+}
+
+fn sys_block_priority(name: &str) -> u8 {
+    if name.starts_with("nvme") {
+        0
+    } else if name.starts_with("sd") {
+        1
+    } else {
+        2
+    }
 }
 
 fn classify_mmc_device(root: &Path, dev: &str, model: BoardModel) -> BootDeviceType {
@@ -865,6 +892,11 @@ mod tests {
             let dev_dir = self.path.join("sys/block").join(dev).join("device");
             fs::create_dir_all(&dev_dir).expect("create sys/block/<dev>/device");
             fs::write(dev_dir.join("type"), format!("{mmc_type}\n")).expect("write mmc type");
+        }
+
+        fn add_sys_block(&self, dev: &str) {
+            let dev_dir = self.path.join("sys/block").join(dev);
+            fs::create_dir_all(&dev_dir).expect("create sys/block/<dev>");
         }
     }
 
@@ -1281,6 +1313,67 @@ mod tests {
             BoardError::UnsupportedBootDevice {
                 model: BoardModel::Pi3BPlus,
                 boot_device: BootDeviceType::UsbSsd,
+                ..
+            }
+        ));
+
+        // NVMe boot on Pi 4B (BCM2711) -> rejected per HW-005.
+        let pi4_nvme = TempFixture::new("pi4-nvme-rejected");
+        pi4_nvme.write_device_tree("Raspberry Pi 4 Model B Rev 1.5", 0x00c0_3115);
+        pi4_nvme.add_mounts("/dev/nvme0n1p4 /data f2fs rw,noatime 0 0\n");
+        let err =
+            detect_from_root(pi4_nvme.root()).expect_err("BCM2711 NVMe boot must be rejected");
+        assert!(matches!(
+            err,
+            BoardError::UnsupportedBootDevice {
+                model: BoardModel::Pi4B,
+                boot_device: BootDeviceType::Nvme,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn hw_005_sys_block_fallback_prioritizes_nvme_and_usb_over_sd() {
+        // Pi 5 without `/proc/mounts` where both an unused SD card (`mmcblk0`)
+        // and an NVMe drive (`nvme0n1`) exist in `/sys/block` -> NVMe wins.
+        let pi5 = TempFixture::new("pi5-sys-block-nvme-over-sd");
+        pi5.write_device_tree("Raspberry Pi 5 Model B Rev 1.0", 0x00d0_4170);
+        pi5.add_mmc_block("mmcblk0", "SD");
+        pi5.add_sys_block("nvme0n1");
+        let caps = detect_from_root(pi5.root()).expect("Pi 5 fallback boot detection");
+        assert_eq!(caps.boot_device, BootDeviceType::Nvme);
+
+        // Pi 4B without `/proc/mounts` where both an unused SD card (`mmcblk0`)
+        // and a USB SSD (`sda`) exist in `/sys/block` -> USB SSD wins.
+        let pi4 = TempFixture::new("pi4-sys-block-usb-over-sd");
+        pi4.write_device_tree("Raspberry Pi 4 Model B Rev 1.5", 0x00c0_3115);
+        pi4.add_mmc_block("mmcblk0", "SD");
+        pi4.add_sys_block("sda");
+        let caps = detect_from_root(pi4.root()).expect("Pi 4B fallback boot detection");
+        assert_eq!(caps.boot_device, BootDeviceType::UsbSsd);
+    }
+
+    #[test]
+    fn hw_001_four_byte_ascii_hex_revision_is_parsed_as_text() {
+        // A 4-byte ASCII hex string in `linux,revision` (e.g. `"000e"`) must be
+        // parsed as hex `0x0000_000e` (rejected as old-style 32-bit), not
+        // misinterpreted as big-endian binary `0x3030_3065`.
+        let fx = TempFixture::new("four-byte-ascii-hex-rev");
+        let dt_sys = fx.root().join("proc/device-tree/system");
+        fs::create_dir_all(&dt_sys).expect("create proc/device-tree/system");
+        fs::write(
+            fx.root().join("proc/device-tree/model"),
+            b"Raspberry Pi Model B Rev 2\0",
+        )
+        .expect("write model");
+        fs::write(dt_sys.join("linux,revision"), b"000e").expect("write 4-byte ascii hex revision");
+
+        let err = detect_from_root(fx.root()).expect_err("0x000e must be rejected as old-style");
+        assert!(matches!(
+            err,
+            BoardError::UnsupportedBoard {
+                revision_code: Some(0x0000_000e),
                 ..
             }
         ));
