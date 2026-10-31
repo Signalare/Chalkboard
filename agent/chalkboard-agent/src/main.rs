@@ -3,15 +3,10 @@
 //! `chalkboard-agent`: discovery, replication, HTTP API and web app, HDMI-CEC,
 //! time, provisioning and updates (SPEC §3).
 
-pub use chalkboard_board as board;
+use chalkboard_agent::banner;
 
 fn main() {
     println!("{}", banner());
-}
-
-/// Name and version printed at startup.
-fn banner() -> String {
-    format!("chalkboard-agent {}", env!("CARGO_PKG_VERSION"))
 }
 
 #[cfg(test)]

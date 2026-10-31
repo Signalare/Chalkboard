@@ -27,5 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `slide` transitions, live sold-out and announcement updates, screen identify
   overlay, first-boot setup and neutral starting screens, and shipped OFL font
   stack with tabular numerals and automatic glyph fallback.
+- `chalkboard-agent` daemon skeleton with SQLite in WAL mode
+  (`synchronous=NORMAL`, group commit ≤ 1 s, periodic checkpointing), record
+  store for 0.1 entities (categories, items, variants, templates, pages,
+  screens), database corruption auto-quarantine and backup recovery,
+  content-addressed atomic binary snapshot builder with render cache image asset
+  support, Unix domain socket renderer IPC protocol (`load_snapshot`,
+  `apply_live_state`, `identify`, `screenshot`, `status`), and process
+  supervision restarting crashed child services within 1 s.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
