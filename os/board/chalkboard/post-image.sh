@@ -47,7 +47,7 @@ cmdline_for_slot() { # <slot_letter> <root_dev>
   local slot="$1"
   local dev="$2"
   local dm_table="0 ${sectors} verity 1 ${dev} ${dev} 4096 4096 ${data_blocks} ${hash_start} sha256 ${root_hash} ${salt} 1 restart_on_corruption"
-  echo "console=ttyAMA0,115200 root=/dev/dm-0 rootfstype=squashfs ro quiet printk.time=1 dm-mod.create=\"rootfs,,ro,${dm_table}\" cb.slot=${slot} cb.layout=autoboot"
+  echo "console=ttyAMA0,115200 root=/dev/dm-0 rootfstype=squashfs rootwait ro quiet printk.time=1 dm-mod.create=\"rootfs,,ro,${dm_table}\" cb.slot=${slot} cb.layout=autoboot"
 }
 
 vfat() { # <image> <size in MiB> <label> <source dir>
