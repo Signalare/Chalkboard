@@ -102,4 +102,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with < 1s restart), and added live `--serial-port` HIL verification to
   `tools/test-ram-logging-oom.py`.
 
+- Physical hardware verification of DRM/KMS renderer boot budget, 30+ fps
+  transitions across rotations, and process independence on Raspberry Pi 4 Model B
+  (`RND-001`, `RND-005`, `RND-008`, `RND-009`, `BOOT-001`, `BOOT-002`, `BOOT-006`,
+  `TEST-001`, `TEST-011`). Added multi-card scanning (`/dev/dri/card*`) and
+  `--benchmark` mode to `chalkboard-render`, verified all 12 transition combinations
+  (`cut` at 330+ fps, `fade` at ~60 fps, `slide` at 200+ fps across 0°, 90°, 180°,
+  and 270° rotations) exceed the 30 fps budget, verified cold first-frame render
+  in 12.3 ms (budget ≤ 1000 ms), validated that killing `chalkboard-agent` leaves
+  `chalkboard-render` running uninterrupted while supervisor restarts the agent,
+  added Buildroot packaging (`os/package/chalkboard-render`), and added automated
+  offline and live `--serial-port` HIL verification to `tools/test-renderer-hil.py`.
+
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main

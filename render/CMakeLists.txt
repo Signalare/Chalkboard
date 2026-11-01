@@ -26,6 +26,7 @@ target_compile_definitions(cb_render_core PRIVATE CB_RENDER_VERSION="${PROJECT_V
 # DRM/KMS backend: the on-device executable.
 add_executable(chalkboard-render src/backends/drm/main.c)
 target_link_libraries(chalkboard-render PRIVATE cb_render_core)
+install(TARGETS chalkboard-render DESTINATION bin)
 
 enable_testing()
 add_executable(test_version tests/test_version.c)
