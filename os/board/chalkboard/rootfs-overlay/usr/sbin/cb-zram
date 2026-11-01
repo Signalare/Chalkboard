@@ -48,6 +48,6 @@ echo "$SWAP_SIZE" > "${ZRAM_SYS}/disksize"
 
 # 4. Format and activate swap
 mkswap "$ZRAM_DEV" >/dev/null
-swapon -p 100 "$ZRAM_DEV"
+swapon -p 100 "$ZRAM_DEV" 2>/dev/null || swapon "$ZRAM_DEV"
 
 echo "cb-zram: Activated $SWAP_SIZE $COMP_ALGO zram swap on $ZRAM_DEV (OS-009)"

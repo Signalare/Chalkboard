@@ -28,6 +28,12 @@ start_file=start4.elf
 fixup_file=fixup4.dat
 # Kernel names per SoC family (OS-002: kernel8.img for Pi 3/4, kernel_2712.img for Pi 5).
 kernel=Image
+# Persistent RAM crash store (OS-008).
+dtoverlay=ramoops-pi4
+
+[pi3]
+# Persistent RAM crash store for BCM2835 / BCM2710 / Zero 2 W (OS-008).
+dtoverlay=ramoops
 
 [pi5]
 kernel=kernel_2712.img

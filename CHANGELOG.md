@@ -91,5 +91,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/dev/sda7`), adding native C partition growth tool (`cb-growpart`), POSIX
   clean shell scripts, and HIL serial test automation (`STO-008`, `STO-009`,
   `STO-011`, `BOOT-001`, `TEST-003`).
+- Physical hardware verification of ramoops/pstore crash capture on panic,
+  automatic reboot, retention pruning, compressed zram swap, and process OOM
+  prioritization on Raspberry Pi 4 Model B (`OS-006`, `OS-008`, `OS-009`,
+  `STO-010`, `TEST-011`). Configured `dtoverlay=ramoops-pi4` in `config.txt` and
+  `panic=5` in kernel cmdline, enabled `CONFIG_FEATURE_SWAPON_PRI=y`, verified
+  pstore panic harvesting and strict 20-report retention pruning in
+  `cb-crash-collect`, validated 128 MB zram swap on `/dev/zram0`, verified
+  renderer protection (`oom_score_adj -900`) and agent supervision (`oom_score_adj 0`
+  with < 1s restart), and added live `--serial-port` HIL verification to
+  `tools/test-ram-logging-oom.py`.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
