@@ -63,6 +63,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `discard`), conditional `fsck.f2fs` on error flags, automatic reformatting
   fallback on unrepairable corruption, and automated test suite
   (`tools/test-f2fs-data.py`) (`STO-008`, `STO-009`, `STO-011`, `BOOT-001`).
+- RAM-only logging (`syslogd -C128` circular buffer, tmpfs `/var/log`),
+  pstore/ramoops panic crash harvester (`cb-crash-collect`) saving to
+  `/data/crashes/` with strict 20-report retention, compressed RAM swap
+  (`cb-zram`, lz4, 128 MB on `/dev/zram0`, prohibiting swap on boot media),
+  and OOM priority protection (`cb-start-render` protecting renderer with
+  `oom_score_adj -900` while agent is sacrificed first) (`OS-008`, `OS-009`,
+  `STO-010`).
   (`/api/v1/cec/power`, `/api/v1/cec/status`), and web UI control panel.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main

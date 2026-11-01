@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Launches chalkboard-render and protects it with oom_score_adj -900 (OS-009, BOOT-003).
+
+set -euo pipefail
+
+RENDERER_BIN="/usr/bin/chalkboard-render"
+OOM_PROTECTED_SCORE="-900"
+
+if [[ ! -x "$RENDERER_BIN" ]]; then
+  echo "cb-start-render: $RENDERER_BIN not found. Skipping render startup."
+  exit 0
+fi
+
+echo "cb-start-render: Starting chalkboard-render with DRM backend..."
+"$RENDERER_BIN" --drm --daemon &
+render_pid=$!
+
+# Wait briefly for process to initialize and assign OOM protection
+sleep 0.1
+if kill -0 "$render_pid" 2>/dev/null; then
+  if [[ -f "/proc/${render_pid}/oom_score_adj" ]]; then
+    echo "$OOM_PROTECTED_SCORE" > "/proc/${render_pid}/oom_score_adj" 2>/dev/null || true
+    echo "cb-start-render: Protected chalkboard-render (PID $render_pid) with oom_score_adj $OOM_PROTECTED_SCORE"
+  fi
+fi

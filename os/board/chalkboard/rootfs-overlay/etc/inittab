@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 #
-# BusyBox inittab for Chalkboard (OS-006, BOOT-003, OS-004, OS-009).
+# BusyBox inittab for Chalkboard (OS-006, BOOT-003, OS-004, OS-008, OS-009).
 
 # Core kernel filesystems
 ::sysinit:/bin/mount -t proc proc /proc
@@ -14,13 +14,23 @@
 ::sysinit:/bin/mount -t tmpfs -o nosuid,nodev,size=8m tmpfs /run
 ::sysinit:/bin/mount -t tmpfs -o nosuid,nodev,size=16m tmpfs /var/log
 
+# Size-capped RAM ring buffer logging: zero routine disk writes (OS-008)
+::sysinit:/sbin/syslogd -C128
+::sysinit:/sbin/klogd
+
+# Activate compressed RAM swap (zram, lz4, 128 MB) (OS-009)
+::sysinit:/usr/sbin/cb-zram
+
 # Initialize and mount persistent /data (STO-008, STO-009, STO-011)
 ::sysinit:/usr/sbin/cb-init-data
 
-# Renderer starts BEFORE agent and any network service (BOOT-003)
-::sysinit:/usr/bin/chalkboard-render --drm --daemon || true
+# Harvest pstore/ramoops crash reports to /data/crashes (max 20) (OS-008)
+::sysinit:/usr/sbin/cb-crash-collect
 
-# Supervisor restarts crashed agent within 1 s (OS-006)
+# Renderer starts BEFORE agent and any network service, protected with oom_score_adj -900 (BOOT-003, OS-009)
+::sysinit:/usr/sbin/cb-start-render
+
+# Supervisor restarts crashed agent within 1 s (OS-006, OS-009: agent sacrificed first)
 ::respawn:/usr/bin/chalkboard-agent --supervisor
 
 # Serial console for diagnostic access
