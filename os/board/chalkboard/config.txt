@@ -4,8 +4,6 @@
 # Applies to all supported boards (Pi 3B+, 4B, 5, Zero 2 W).
 
 [all]
-start_file=start4.elf
-fixup_file=fixup4.dat
 # Kernel names per SoC family (OS-002: kernel8.img for Pi 3/4, kernel_2712.img for Pi 5).
 kernel=Image
 arm_64bit=1
@@ -16,7 +14,7 @@ disable_splash=1
 disable_overscan=1
 
 # KMS display driver (DRM for chalkboard-render, and HDMI-CEC).
-dtoverlay=vc4-kms-v3d
+dtoverlay=vc4-kms-v3d,noaudio
 
 # Serial console enabled for headless debugging and testing.
 enable_uart=1
@@ -32,6 +30,8 @@ kernel=Image
 dtoverlay=ramoops-pi4
 
 [pi3]
+start_file=start.elf
+fixup_file=fixup.dat
 # Persistent RAM crash store for BCM2835 / BCM2710 / Zero 2 W (OS-008).
 dtoverlay=ramoops
 
