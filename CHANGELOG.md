@@ -101,6 +101,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renderer protection (`oom_score_adj -900`) and agent supervision (`oom_score_adj 0`
   with < 1s restart), and added live `--serial-port` HIL verification to
   `tools/test-ram-logging-oom.py`.
+- Verified board and hardware capability detection on physical hardware (Raspberry
+  Pi 4 Model B Rev 1.1, `c03111`), validating live kernel device-tree nodes and sysfs
+  paths against SPEC §4 requirements (`HW-001`, `HW-009`, `TEST-011`). Captured live
+  hardware sysfs/procfs test fixture into `chalkboard-board` test suite, added
+  `--detect-board` JSON capability CLI to `chalkboard-agent`, and implemented
+  `tools/test-board-detection.py` covering both offline fixtures and live serial HIL
+  interrogation.
 
 - Physical hardware verification of DRM/KMS renderer boot budget, 30+ fps
   transitions across rotations, and process independence on Raspberry Pi 4 Model B

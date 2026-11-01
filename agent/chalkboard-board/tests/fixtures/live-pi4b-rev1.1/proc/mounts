@@ -1,0 +1,6 @@
+/dev/root / ext4 ro,relatime 0 0
+devtmpfs /dev devtmpfs rw,relatime,size=1680032k,nr_inodes=420008,mode=755 0 0
+proc /proc proc rw,relatime 0 0
+sysfs /sys sysfs rw,relatime 0 0
+tmpfs /tmp tmpfs rw,relatime,size=65536k 0 0
+tmpfs /run tmpfs rw,relatime,size=1024k 0 0

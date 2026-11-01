@@ -140,6 +140,16 @@ pub enum SupportTier {
     Tier3,
 }
 
+impl fmt::Display for SupportTier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tier1 => f.write_str("Tier 1"),
+            Self::Tier2 => f.write_str("Tier 2"),
+            Self::Tier3 => f.write_str("Tier 3"),
+        }
+    }
+}
+
 /// Raspberry Pi 64-bit SoC family (SPEC §1.4, §4.1).
 ///
 /// Ordered from lowest to highest capability (`Bcm2837 < Bcm2711 < Bcm2712`)
@@ -155,6 +165,16 @@ pub enum SocFamily {
     Bcm2712,
 }
 
+impl fmt::Display for SocFamily {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bcm2837 => f.write_str("BCM2837"),
+            Self::Bcm2711 => f.write_str("BCM2711"),
+            Self::Bcm2712 => f.write_str("BCM2712"),
+        }
+    }
+}
+
 /// Wi-Fi radio band capabilities of a node (HW-007, WIFI-011, WIFI-012).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -165,6 +185,16 @@ pub enum WifiBands {
     Band2_4Ghz,
     /// Dual-band 2.4 GHz and 5 GHz (Pi 3B+, 3A+, 4B, 400, 5, 500, wireless CM4/CM5).
     DualBand,
+}
+
+impl fmt::Display for WifiBands {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::None => f.write_str("none"),
+            Self::Band2_4Ghz => f.write_str("2.4 GHz"),
+            Self::DualBand => f.write_str("dual-band (2.4/5 GHz)"),
+        }
+    }
 }
 
 impl WifiBands {
@@ -193,6 +223,17 @@ pub enum BootDeviceType {
     UsbSsd,
     /// PCIe NVMe SSD (supported on BCM2712).
     Nvme,
+}
+
+impl fmt::Display for BootDeviceType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MicroSd => f.write_str("microSD"),
+            Self::Emmc => f.write_str("eMMC"),
+            Self::UsbSsd => f.write_str("USB SSD"),
+            Self::Nvme => f.write_str("NVMe"),
+        }
+    }
 }
 
 /// Detected board identity and hardware capabilities for the `Node` record (HW-009).
@@ -966,6 +1007,28 @@ mod tests {
                 },
             },
             BoardCase {
+                label: "pi-4b-4gb-rev1.1",
+                dt_model: "Raspberry Pi 4 Model B Rev 1.1",
+                revision: 0x00c0_3111,
+                with_wifi: true,
+                with_eth: true,
+                with_rtc: false,
+                mmc_type: "SD",
+                expected: BoardCapabilities {
+                    model: BoardModel::Pi4B,
+                    model_name: "Raspberry Pi 4 Model B Rev 1.1".to_owned(),
+                    revision_code: 0x00c0_3111,
+                    support_tier: SupportTier::Tier1,
+                    soc_family: SocFamily::Bcm2711,
+                    ram_mb: 4096,
+                    hdmi_outputs: 2,
+                    wifi_bands: WifiBands::DualBand,
+                    has_ethernet: true,
+                    has_rtc: false,
+                    boot_device: BootDeviceType::MicroSd,
+                },
+            },
+            BoardCase {
                 label: "pi-4b-4gb",
                 dt_model: "Raspberry Pi 4 Model B Rev 1.4",
                 revision: 0x00c0_3114,
@@ -1401,5 +1464,25 @@ mod tests {
         assert!(caps.has_ethernet);
         assert!(caps.has_rtc);
         assert_eq!(caps.wifi_bands, WifiBands::Band2_4Ghz);
+    }
+
+    #[test]
+    fn hw_001_hw_009_live_pi4b_rev1_1_fixture_detected() {
+        let fixture_path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/live-pi4b-rev1.1");
+        let caps = detect_from_root(&fixture_path)
+            .expect("live Raspberry Pi 4 Model B Rev 1.1 fixture must be detected successfully");
+
+        assert_eq!(caps.model, BoardModel::Pi4B);
+        assert_eq!(caps.model_name, "Raspberry Pi 4 Model B Rev 1.1");
+        assert_eq!(caps.revision_code, 0x00c0_3111);
+        assert_eq!(caps.support_tier, SupportTier::Tier1);
+        assert_eq!(caps.soc_family, SocFamily::Bcm2711);
+        assert_eq!(caps.ram_mb, 4096);
+        assert_eq!(caps.hdmi_outputs, 2);
+        assert_eq!(caps.wifi_bands, WifiBands::DualBand);
+        assert!(caps.has_ethernet);
+        assert!(!caps.has_rtc);
+        assert_eq!(caps.boot_device, BootDeviceType::MicroSd);
     }
 }
