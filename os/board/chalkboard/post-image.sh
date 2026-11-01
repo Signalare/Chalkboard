@@ -60,14 +60,20 @@ firmware_to() { # <dir>
   mkdir -p "$1"
   if [[ -d "$fw" ]]; then
     for f in start.elf fixup.dat start4.elf fixup4.dat; do
-      [[ -f "$fw/$f" ]] && cp "$fw/$f" "$1/" || true
+      if [[ -f "$fw/$f" ]]; then
+        cp "$fw/$f" "$1/"
+      fi
     done
   fi
 }
 
 eeprom_to() { # <dir>
   if [[ -d "${BINARIES_DIR}/rpi-eeprom" ]]; then
-    cp "${BINARIES_DIR}"/rpi-eeprom/{recovery.bin,pieeprom.upd,pieeprom.sig} "$1/" 2>/dev/null || true
+    for f in recovery.bin pieeprom.upd pieeprom.sig; do
+      if [[ -f "${BINARIES_DIR}/rpi-eeprom/$f" ]]; then
+        cp "${BINARIES_DIR}/rpi-eeprom/$f" "$1/"
+      fi
+    done
   fi
 }
 
