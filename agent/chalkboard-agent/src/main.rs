@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use chalkboard_agent::banner;
+use chalkboard_agent::cec::CecService;
 use chalkboard_agent::http::HttpServer;
 use chalkboard_agent::store::{Category, Item, Page, Screen, Store, Template};
 
@@ -27,6 +28,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  --db <PATH>        SQLite database path [default: build/data/chalkboard.db]");
         println!("  --web-dist <PATH>  Web static assets directory [default: web/dist]");
         println!("  --snapshots <PATH> Snapshots root directory [default: build/snapshots]");
+        println!(
+            "  --mock-hardware    Enable mock hardware adapters for offline development (#25)"
+        );
         println!("  --version, -V      Print version banner");
         println!("  --help, -h         Print help information");
         return Ok(());
@@ -38,6 +42,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut db_path = "build/data/chalkboard.db".to_string();
     let mut web_dist = "web/dist".to_string();
     let mut snapshots = "build/snapshots".to_string();
+    let mut mock_hardware = std::env::var("CHALKBOARD_MOCK_HARDWARE")
+        .map(|v| v == "1" || v == "true")
+        .unwrap_or(false);
 
     let mut i = 1;
     while i < args.len() {
@@ -58,6 +65,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 snapshots = args[i + 1].clone();
                 i += 2;
             }
+            "--mock-hardware" => {
+                mock_hardware = true;
+                i += 1;
+            }
             _ => {
                 i += 1;
             }
@@ -72,12 +83,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let store = Store::open(&db_path, None)?;
     seed_demo_data_if_empty(&store)?;
 
+    let cec_service = CecService::new_auto(mock_hardware, "Chalkboard");
+    println!(
+        "CEC adapter initialized: {} (mock={})",
+        cec_service.primary().device_name(),
+        cec_service.primary().is_mock()
+    );
+
     let server = HttpServer::start(
         &bind_addr,
         store,
         PathBuf::from(&snapshots),
         PathBuf::from(&web_dist),
         None,
+        Some(cec_service),
     )?;
 
     println!(

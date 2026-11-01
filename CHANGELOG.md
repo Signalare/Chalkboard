@@ -43,5 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen configuration (rotation: 0/90/180/270, dimensions, sold-out display
   mode) and playlist sequence manager, and an embedded agent HTTP/1.1 API
   (`/api/v1`) with instant snapshot publish capability.
+- In-memory mock device test harness for HDMI-CEC (`CEC-001`–`CEC-006`) with
+  abstract adapter trait (`CecAdapter`), pure software simulation
+  (`MockCecAdapter`) tracking simulated TV power state, active source and OSD
+  name with error/NACK injection, developer mode (`--mock-hardware`), Linux
+  kernel character device driver (`/dev/cec0`, `/dev/cec1`), REST API endpoints
+  (`/api/v1/cec/power`, `/api/v1/cec/status`), and web UI control panel.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main

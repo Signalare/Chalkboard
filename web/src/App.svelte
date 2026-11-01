@@ -2,12 +2,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from './api';
-  import type { Category, Item, NodeStatus, Page, Screen, Template } from './types';
+  import type { Category, CecStatus, Item, NodeStatus, Page, Screen, Template } from './types';
 
   type Tab = 'sold-out' | 'menu' | 'templates' | 'screens';
 
   let currentTab = $state<Tab>('sold-out');
   let status = $state<NodeStatus | null>(null);
+  let cecStatus = $state<CecStatus | null>(null);
   let categories = $state<Category[]>([]);
   let items = $state<Item[]>([]);
   let templates = $state<Template[]>([]);
@@ -70,13 +71,14 @@
     loading = true;
     errorMessage = null;
     try {
-      const [s, c, i, t, p, sc] = await Promise.all([
+      const [s, c, i, t, p, sc, cec] = await Promise.all([
         api.getStatus().catch(() => null),
         api.getCategories().catch(() => []),
         api.getItems().catch(() => []),
         api.getTemplates().catch(() => []),
         api.getPages().catch(() => []),
         api.getScreens().catch(() => []),
+        api.getCecStatus().catch(() => null),
       ]);
       status = s;
       categories = c;
@@ -84,10 +86,21 @@
       templates = t;
       pages = p;
       screens = sc;
+      cecStatus = cec;
     } catch (err: unknown) {
       errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       loading = false;
+    }
+  }
+
+  async function handleCecAction(action: 'on' | 'standby' | 'active-source') {
+    try {
+      await api.sendCecPower(action);
+      showFeedback(`HDMI-CEC signal sent: ${action}`);
+      cecStatus = await api.getCecStatus().catch(() => cecStatus);
+    } catch (err: unknown) {
+      errorMessage = err instanceof Error ? err.message : String(err);
     }
   }
 
@@ -885,6 +898,53 @@
           </div>
         {/if}
 
+        {#if cecStatus}
+          <div class="cec-control-panel">
+            <div class="cec-header">
+              <div>
+                <h3>HDMI-CEC Display Control</h3>
+                <p class="section-sub">
+                  Direct hardware and simulated display power management (CEC-001..CEC-005).
+                </p>
+              </div>
+              <div class="cec-badges">
+                {#if cecStatus.is_mock}
+                  <span class="badge-mock" title="Running in simulated offline mode (#25)"
+                    >Mock Hardware Device</span
+                  >
+                {/if}
+                <span
+                  class="status-pill"
+                  class:pill-success={cecStatus.primary_power === 'on'}
+                  class:pill-danger={cecStatus.primary_power === 'standby'}
+                >
+                  TV: {cecStatus.primary_power.toUpperCase()}
+                </span>
+              </div>
+            </div>
+
+            <div class="cec-actions">
+              <button type="button" class="btn btn-primary" onclick={() => handleCecAction('on')}>
+                ⚡ Power On TV & Take Input
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onclick={() => handleCecAction('active-source')}
+              >
+                📺 Re-assert Active Source
+              </button>
+              <button
+                type="button"
+                class="btn btn-danger"
+                onclick={() => handleCecAction('standby')}
+              >
+                💤 TV Standby
+              </button>
+            </div>
+          </div>
+        {/if}
+
         <div class="screens-overview">
           <h3>Connected Displays</h3>
           <div class="screens-grid">
@@ -1514,6 +1574,57 @@
     font-size: 0.8rem;
     color: var(--text-muted);
     margin: 0.2rem 0;
+  }
+
+  /* CEC Panel (#25, CEC-001..CEC-006) */
+  .cec-control-panel {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-block-end: 2rem;
+  }
+
+  .cec-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-block-end: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .cec-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  .cec-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .badge-mock {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding-inline: 0.5rem;
+    padding-block: 0.2rem;
+    border-radius: 9999px;
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+  }
+
+  .pill-success {
+    background-color: #dcfce7;
+    color: #166534;
+  }
+
+  .cec-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
   /* Screens & Playlist */
