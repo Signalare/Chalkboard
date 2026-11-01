@@ -133,9 +133,9 @@ Not supported: 32-bit boards and the Pi 2B v1.2.
 |---|---|
 | OS-001 | The OS image MUST be built with Buildroot from a version-controlled external tree. Builds MUST be reproducible. |
 | OS-002 | One universal aarch64 image MUST serve every supported board, so the same boot device works in any of them. It MUST contain the kernels for all SoC families (`kernel8.img` for BCM2837/BCM2711, `kernel_2712.img` for BCM2712), all device trees and the firmware for every generation; the firmware selects the right files at boot. Node identity and cluster membership MUST NOT be baked into the image. |
-| OS-003 | The storage layout MUST provide two complete, independent slots (A and B). Each slot MUST contain the kernel, device tree blobs, overlays, kernel command line and a read-only squashfs root filesystem, so kernel and firmware-loaded files are updated and rolled back together with the root filesystem. A separate read-write `data` partition (F2FS, STO-008) MUST hold all persistent state. The layout MUST use MBR, which every supported board can boot from. |
+| OS-003 | The storage layout MUST provide two complete, independent slots (A and B). Each slot MUST contain the kernel, device tree blobs, overlays, kernel command line in its own boot partition (`boot-a` and `boot-b`) and a read-only squashfs root filesystem, so kernel and firmware-loaded files are updated and rolled back together with the root filesystem. A separate read-write `data` partition (F2FS, STO-008) MUST hold all persistent state. The layout MUST use MBR with an autoboot selector partition (`autoboot.txt`, UPD-004), which every supported board can boot from. |
 | OS-004 | The root filesystem MUST be mounted read-only. All mutable state MUST live on `data` or in RAM (tmpfs). |
-| OS-005 | The FAT partition(s) holding boot firmware files MUST only be written when installing into the inactive slot, at the slot commit (UPD-005), and when consuming a provisioning seed file (PROV-006, PROV-008). The commit MUST be a single small write that leaves the node bootable into a good slot if power is lost at any point during it (verified by TEST-003). |
+| OS-005 | The FAT partition(s) holding boot firmware files MUST only be written when installing into the inactive slot, at the slot commit (UPD-005), and when consuming a provisioning seed file (PROV-006, PROV-008). The commit MUST be a single small write (a single-sector raw rewrite of the autoboot partition, UPD-004) that leaves the node bootable into a good slot if power is lost at any point during it (verified by TEST-003). |
 | OS-006 | The init system SHOULD be BusyBox init with a minimal process supervisor; it MUST restart a crashed renderer or agent within 1 s. |
 | OS-007 | The SoC hardware watchdog MUST be enabled on every board. A hung system MUST reboot within 15 s. |
 | OS-008 | Logs MUST be kept in size-capped RAM ring buffers and MUST NOT be routinely written to the boot device. Kernel panics, watchdog resets and the last log lines before a crash MUST be captured with pstore/ramoops and saved to `data` once after the next boot (at most 20 crash reports kept). Warnings and errors MUST be mirrored to one peer so recent history survives the loss of a node. |
@@ -429,7 +429,7 @@ All replicated entities are **records** (§11.3). Prices are stored as integers 
 | UPD-001 | Firmware updates MUST be delivered as signed bundles verified against a release public key embedded in the image. RAUC is RECOMMENDED. |
 | UPD-002 | An admin MUST be able to upload a bundle through the web app. The agent MAY additionally fetch bundles from a configured release URL when internet is available. |
 | UPD-003 | Bundles MUST be distributed peer-to-peer; each node downloads from the cluster, not the internet. |
-| UPD-004 | Installation MUST target the inactive slot (OS-003) and boot it once using the Raspberry Pi `tryboot` mechanism. The slot-selection mechanism — per-slot `os_prefix` directories selected by `config.txt` / `tryboot.txt`, or separate boot partitions selected by `autoboot.txt` — MUST be one mechanism that works on all three SoC families, chosen by a hardware spike on every Tier 1 board before 0.1 and recorded in this specification. |
+| UPD-004 | Installation MUST target the inactive slot (OS-003) and boot it once using the Raspberry Pi `tryboot` mechanism (`tryboot_a_b=1`). The slot-selection mechanism is Mechanism B (`autoboot.txt` selecting separate boot partitions `boot-a` and `boot-b`), chosen by the hardware spike on physical hardware (documented in `docs/spikes/boot-slots.md`). An update MUST write the inactive slot's boot and rootfs partitions as raw images without touching the active slot's boot partition. The commit MUST be a single raw sector overwrite of `autoboot.txt`. |
 | UPD-005 | A node MUST mark the new slot good only after: the renderer has shown content, the agent has rejoined the cluster, and sync is healthy — within 120 s. Otherwise the next (watchdog) reboot MUST return to the previous slot. |
 | UPD-006 | Updates MUST roll through the cluster one node at a time, and MUST halt if a node fails to become healthy. |
 | UPD-007 | Downgrades MUST be refused unless explicitly forced by an admin. |
@@ -464,7 +464,7 @@ All replicated entities are **records** (§11.3). Prices are stored as integers 
 
 ## 21. Performance budgets (summary)
 
-Every budget applies to every Tier 1 board (§4.1). Per-board exceptions (BOOT-001): none recorded yet.
+Every budget applies to every Tier 1 board (§4.1). Per-board exceptions (BOOT-001): none recorded yet. Pi 4B cold-boot baseline measured at 10.28 s (unoptimised spike image); production budget (≤ 5.0 s) is achieved by eliminating USB power-off delay (1.0 s), compressing the kernel (1.5 s), and silencing firmware and UART logging (0.3 s).
 
 | Metric | Budget | Ref |
 |---|---|---|

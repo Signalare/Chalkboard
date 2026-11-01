@@ -129,5 +129,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.00 MB/day <= 1.0 MB budget); measured typical workload writes (50 atomic item
   toggles + 1 publication) at 0.21 MB (well under the 50.0 MB/day budget); and
   extended `tools/test-write-budget.py` with live `--serial-port` HIL verification.
+- Decision and specification updates for the A/B boot-slot mechanism based on
+  physical hardware spike results on Raspberry Pi 4 Model B (`UPD-004`, `OS-003`,
+  `OS-005`, `OS-011`, `BOOT-001`). Adopted Mechanism B (`autoboot.txt` selecting
+  independent FAT32 boot partitions `boot-a` and `boot-b` with `tryboot_a_b=1`),
+  providing complete filesystem isolation during OTA updates without mutating
+  the running slot's boot partition, single-sector raw atomic commit verified
+  across 200 random power-cut torture cycles, cold boot stage breakdown
+  (10.28 s unoptimized baseline), and documented optimization roadmap to meet
+  the ≤ 5.0 s BOOT-001 budget in production.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
