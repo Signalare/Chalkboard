@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Configures compressed RAM swap (zram, lz4, 128 MB) (OS-009).
+# Strictly ensures no swap is active on the boot storage device.
+
+set -euo pipefail
+
+ZRAM_DEV="/dev/zram0"
+ZRAM_SYS="/sys/block/zram0"
+SWAP_SIZE="128M"
+COMP_ALGO="lz4"
+
+# 1. Disable any swap on persistent boot storage (OS-009)
+if [[ -f /proc/swaps ]]; then
+  while read -r dev rest; do
+    if [[ "$dev" != "Filename" && "$dev" != *"/zram"* ]]; then
+      echo "cb-zram: Disabling prohibited storage swap on $dev (OS-009)"
+      swapoff "$dev" 2>/dev/null || true
+    fi
+  done < /proc/swaps
+fi
+
+# 2. Ensure zram module or device is available
+if [[ ! -b "$ZRAM_DEV" ]]; then
+  modprobe zram num_devices=1 2>/dev/null || true
+fi
+
+if [[ ! -d "$ZRAM_SYS" ]]; then
+  echo "cb-zram: zram kernel support not available. Skipping zram swap."
+  exit 0
+fi
+
+# 3. Configure zram: lz4 compression and 128 MB capacity
+# Reset device if already initialized
+if [[ -f "${ZRAM_SYS}/reset" ]]; then
+  echo 1 > "${ZRAM_SYS}/reset" 2>/dev/null || true
+fi
+
+if [[ -f "${ZRAM_SYS}/comp_algorithm" ]]; then
+  echo "$COMP_ALGO" > "${ZRAM_SYS}/comp_algorithm" 2>/dev/null || true
+fi
+
+echo "$SWAP_SIZE" > "${ZRAM_SYS}/disksize"
+
+# 4. Format and activate swap
+mkswap "$ZRAM_DEV" >/dev/null
+swapon -p 100 "$ZRAM_DEV"
+
+echo "cb-zram: Activated $SWAP_SIZE $COMP_ALGO zram swap on $ZRAM_DEV (OS-009)"
