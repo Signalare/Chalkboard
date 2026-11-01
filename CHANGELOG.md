@@ -120,5 +120,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `chalkboard-render` running uninterrupted while supervisor restarts the agent,
   added Buildroot packaging (`os/package/chalkboard-render`), and added automated
   offline and live `--serial-port` HIL verification to `tools/test-renderer-hil.py`.
+- Physical hardware verification of 24-hour storage write budgets, partition
+  immutability, and STO-010 allowlist enforcement on Raspberry Pi 4 Model B with
+  124 GB USB block storage (`TEST-009`, `STO-010`, `STO-013`, `TEST-011`). Verified
+  zero routine sectors written to `/boot` (`sda1`, `sda2`) and rootfs (`sda5`, `sda6`)
+  over extended physical runs; verified 100% of persistent files on `/data` conform
+  strictly to the STO-010 allowlist; measured idle writes at 0 bytes/sec (projected
+  0.00 MB/day <= 1.0 MB budget); measured typical workload writes (50 atomic item
+  toggles + 1 publication) at 0.21 MB (well under the 50.0 MB/day budget); and
+  extended `tools/test-write-budget.py` with live `--serial-port` HIL verification.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
