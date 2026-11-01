@@ -138,5 +138,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   across 200 random power-cut torture cycles, cold boot stage breakdown
   (10.28 s unoptimized baseline), and documented optimization roadmap to meet
   the ≤ 5.0 s BOOT-001 budget in production.
+- Automated hardware-in-the-loop (HIL) boot-time measurement rig
+  (`tools/hil/measure-boot-time.py`) and rig documentation (`tools/hil/README.md`)
+  for automated unattended cold-boot execution and performance budget gating in
+  CI (`TEST-001`, `BOOT-001`, `TEST-003`). Supports relay power switching (Shelly
+  HTTP RPC, USB relay, soft-cycle), microsecond log stage timestamp parsing
+  (bootloader, firmware, kernel, and userspace), unattended N-cycle statistical
+  analysis (`p50`, `p95`, min, max, stddev), machine-readable JSON and CSV
+  reporting, and full offline/unit test suite for deterministic CI execution.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
