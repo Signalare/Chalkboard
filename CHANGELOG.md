@@ -56,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kernel cmdline `dm-mod.create` dm-verity Merkle tree integrity verification,
   `tools/mkverity.py`, and `tools/check-os-image.py` validator (`OS-001`–`OS-004`,
   `OS-010`, `BOOT-004`, `BOOT-007`).
+- F2FS `/data` partition first-boot growth script (`cb-init-data`), resizing
+  partition to device capacity minus 10% spare area (capped at 32 GB) followed
+  by offline `resize.f2fs`, idempotent growth checking, fast immediate mounting
+  with required flags (`noatime`, `fsync_mode=posix`, `background_gc=on`,
+  `discard`), conditional `fsck.f2fs` on error flags, automatic reformatting
+  fallback on unrepairable corruption, and automated test suite
+  (`tools/test-f2fs-data.py`) (`STO-008`, `STO-009`, `STO-011`, `BOOT-001`).
   (`/api/v1/cec/power`, `/api/v1/cec/status`), and web UI control panel.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
