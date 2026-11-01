@@ -48,6 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`MockCecAdapter`) tracking simulated TV power state, active source and OSD
   name with error/NACK injection, developer mode (`--mock-hardware`), Linux
   kernel character device driver (`/dev/cec0`, `/dev/cec1`), REST API endpoints
+  (`/api/v1/cec/*`), and minimalist status badge with control dropdown in screen
+  cards.
+- Universal aarch64 Buildroot external tree (`os/`) and defconfig
+  (`chalkboard_defconfig`) producing dual-slot A/B MBR images (`chalkboard.img`)
+  with `autoboot.txt` tryboot switching, read-only squashfs root filesystems,
+  kernel cmdline `dm-mod.create` dm-verity Merkle tree integrity verification,
+  `tools/mkverity.py`, and `tools/check-os-image.py` validator (`OS-001`–`OS-004`,
+  `OS-010`, `BOOT-004`, `BOOT-007`).
   (`/api/v1/cec/power`, `/api/v1/cec/status`), and web UI control panel.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
