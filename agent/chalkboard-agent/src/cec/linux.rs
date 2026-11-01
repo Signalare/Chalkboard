@@ -139,7 +139,9 @@ impl CecAdapter for LinuxCecAdapter {
 
             let ret = unsafe { libc::ioctl(file.as_raw_fd(), CEC_TRANSMIT, &mut raw_msg) };
             if ret < 0 {
-                return Err(CecError::Io(std::io::Error::last_os_error()));
+                return Err(CecError::BusError(
+                    std::io::Error::last_os_error().to_string(),
+                ));
             }
 
             // Record active source locally if we sent it
@@ -180,7 +182,7 @@ impl CecAdapter for LinuxCecAdapter {
             let ret = unsafe { libc::ioctl(file.as_raw_fd(), CEC_RECEIVE, &mut raw_msg) };
             if ret == 0 && raw_msg.len > 0 {
                 let slice = &raw_msg.msg[..raw_msg.len as usize];
-                if let Ok(msg) = CecMessage::parse(slice) {
+                if let Ok(msg) = CecMessage::from_raw_bytes(slice) {
                     return Ok(Some(msg));
                 }
             }
@@ -218,13 +220,7 @@ impl CecAdapter for LinuxCecAdapter {
 
             let ret = unsafe { libc::ioctl(file.as_raw_fd(), CEC_TRANSMIT, &mut raw_msg) };
             if ret == 0 && (raw_msg.rx_status & 1) != 0 && raw_msg.len >= 3 {
-                match raw_msg.msg[2] {
-                    0 => Ok(PowerStatus::On),
-                    1 => Ok(PowerStatus::Standby),
-                    2 => Ok(PowerStatus::TransitionToOn),
-                    3 => Ok(PowerStatus::TransitionToStandby),
-                    _ => Ok(PowerStatus::Unknown),
-                }
+                Ok(PowerStatus::from_u8(raw_msg.msg[2]))
             } else {
                 Ok(PowerStatus::Unknown)
             }
