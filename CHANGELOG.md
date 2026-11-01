@@ -76,5 +76,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and testing daily write budgets against idle (≤ 1 MB/day) and typical use
   (50 toggles, 1 publication ≤ 50 MB/day) (`TEST-009`, `STO-010`, `STO-013`).
   (`/api/v1/cec/power`, `/api/v1/cec/status`), and web UI control panel.
+- Physical hardware boot verification and automated HIL test suite
+  (`tools/test-universal-image-boot.py`) for the universal Buildroot image on
+  Raspberry Pi 4 Model B (rev `c03111`), validating cold boot across SD and USB
+  storage (`PARTUUID`), read-only rootfs mount under `dm-verity` (`/dev/dm-0`),
+  hardware watchdog (`bcm2835_wdt`), DRM/KMS `vc4-drm` display initialization,
+  one-shot `tryboot` slot switching (Slot A/B), and runtime dm-verity corruption
+  detection triggering immediate fail-safe reboot and fallback to the alternate
+  slot (`OS-001`–`OS-004`, `OS-007`, `OS-010`, `BOOT-004`, `BOOT-007`,
+  `TEST-011`).
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main

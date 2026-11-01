@@ -43,11 +43,12 @@ salt=$(grep '^SALT=' "$verity_out" | cut -d= -f2)
 
 echo "dm-verity parameters: sectors=${sectors}, blocks=${data_blocks}, root_hash=${root_hash}"
 
-cmdline_for_slot() { # <slot_letter> <root_dev>
+cmdline_for_slot() { # <slot_letter> <part_num>
   local slot="$1"
-  local dev="$2"
+  local part="$2"
+  local dev="PARTUUID=5349474e-0${part}"
   local dm_table="0 ${sectors} verity 1 ${dev} ${dev} 4096 4096 ${data_blocks} ${hash_start} sha256 ${root_hash} ${salt} 1 restart_on_corruption"
-  echo "console=ttyAMA0,115200 root=/dev/dm-0 rootfstype=squashfs ro quiet printk.time=1 dm-mod.create=\"rootfs,,ro,${dm_table}\" cb.slot=${slot} cb.layout=autoboot"
+  echo "console=ttyAMA0,115200 root=/dev/dm-0 rootfstype=squashfs rootwait dm-mod.waitfor=${dev} ro quiet printk.time=1 dm-mod.create=\"rootfs,,,ro,${dm_table}\" cb.slot=${slot} cb.layout=autoboot"
 }
 
 vfat() { # <image> <size in MiB> <label> <source dir>
@@ -59,7 +60,7 @@ vfat() { # <image> <size in MiB> <label> <source dir>
 firmware_to() { # <dir>
   mkdir -p "$1"
   if [[ -d "$fw" ]]; then
-    for f in start.elf fixup.dat start4.elf fixup4.dat; do
+    for f in bootcode.bin start.elf fixup.dat start4.elf fixup4.dat; do
       if [[ -f "$fw/$f" ]]; then
         cp "$fw/$f" "$1/"
       fi
@@ -81,6 +82,7 @@ kernel_and_dtbs_to() { # <dir> <cmdline_content>
   mkdir -p "$1"
   # Support universal kernel names (OS-002)
   if [[ -f "${BINARIES_DIR}/Image" ]]; then
+    cp "${BINARIES_DIR}/Image" "$1/Image"
     cp "${BINARIES_DIR}/Image" "$1/kernel8.img"
     cp "${BINARIES_DIR}/Image" "$1/kernel_2712.img"
   fi
@@ -97,22 +99,24 @@ kernel_and_dtbs_to() { # <dir> <cmdline_content>
 d="$work/autoboot"
 mkdir -p "$d"
 printf '[all]\ntryboot_a_b=1\nboot_partition=2\n[tryboot]\nboot_partition=3\n' > "$d/autoboot.txt"
-eeprom_to "$d"
+if [[ -f "$fw/bootcode.bin" ]]; then
+  cp "$fw/bootcode.bin" "$d/"
+fi
 vfat "${BINARIES_DIR}/autoboot.vfat" 16 AUTOBOOT "$d"
 
-# 3. Build Partition 2: BOOT_A (FAT32, 64 MiB)
+# 3. Build Partition 2: BOOT_A (FAT32, 128 MiB)
 d="$work/boot-a"
 firmware_to "$d"
 cp "$board_dir/config.txt" "$d/config.txt"
-kernel_and_dtbs_to "$d" "$(cmdline_for_slot a /dev/mmcblk0p5)"
-vfat "${BINARIES_DIR}/boot-a.vfat" 64 BOOT_A "$d"
+kernel_and_dtbs_to "$d" "$(cmdline_for_slot a 5)"
+vfat "${BINARIES_DIR}/boot-a.vfat" 128 BOOT_A "$d"
 
-# 4. Build Partition 3: BOOT_B (FAT32, 64 MiB)
+# 4. Build Partition 3: BOOT_B (FAT32, 128 MiB)
 d="$work/boot-b"
 firmware_to "$d"
 cp "$board_dir/config.txt" "$d/config.txt"
-kernel_and_dtbs_to "$d" "$(cmdline_for_slot b /dev/mmcblk0p6)"
-vfat "${BINARIES_DIR}/boot-b.vfat" 64 BOOT_B "$d"
+kernel_and_dtbs_to "$d" "$(cmdline_for_slot b 6)"
+vfat "${BINARIES_DIR}/boot-b.vfat" 128 BOOT_B "$d"
 
 # 5. Build Initial Data Partition: DATA (128 MiB)
 data_img="${BINARIES_DIR}/data.f2fs"
