@@ -152,6 +152,170 @@ class TestRamLoggingAndOom(unittest.TestCase):
         self.assertIn("cb-start-render", content)
         self.assertIn("chalkboard-agent --supervisor", content)
 
+    def test_ramoops_config_and_panic(self):
+        repo_root = Path(__file__).resolve().parent.parent
+        config_txt = repo_root / "os/board/chalkboard/config.txt"
+        config_content = config_txt.read_text(encoding="utf-8")
+        self.assertIn("dtoverlay=ramoops-pi4", config_content)
+        self.assertIn("dtoverlay=ramoops", config_content)
+
+        post_image = repo_root / "os/board/chalkboard/post-image.sh"
+        post_content = post_image.read_text(encoding="utf-8")
+        self.assertIn("panic=5", post_content)
+
+        busybox_frag = repo_root / "os/board/chalkboard/busybox.fragment"
+        busybox_content = busybox_frag.read_text(encoding="utf-8")
+        self.assertIn("CONFIG_FEATURE_SWAPON_PRI=y", busybox_content)
+
+
+def run_hil_ram_logging_oom_verification(port: str, baud: int = 115200) -> bool:
+    """Verifies live ramoops pstore crash dumps, zram swap, and OOM priorities over serial."""
+    import argparse
+    import select
+    import termios
+
+    print(f"[HIL-RAM-OOM] Opening serial port {port} at {baud} baud...")
+    fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+    try:
+        attrs = termios.tcgetattr(fd)
+        attrs[0] = 0
+        attrs[1] = 0
+        attrs[2] = termios.CS8 | termios.CREAD | termios.CLOCAL
+        attrs[3] = 0
+        attrs[4] = termios.B115200
+        attrs[5] = termios.B115200
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+
+        def exec_cmd(cmd: str, timeout: float = 3.0) -> str:
+            while True:
+                r, _, _ = select.select([fd], [], [], 0.05)
+                if not r:
+                    break
+                os.read(fd, 1024)
+            os.write(fd, (cmd + "\n").encode("utf-8"))
+            time.sleep(0.3)
+            out = b""
+            t0 = time.time()
+            while time.time() - t0 < timeout:
+                r, _, _ = select.select([fd], [], [], 0.4)
+                if not r:
+                    break
+                chunk = os.read(fd, 1024)
+                if not chunk:
+                    break
+                out += chunk
+            return out.decode("utf-8", errors="replace")
+
+        def extract_int(output: str, default: int = 0) -> int:
+            for token in reversed(output.split()):
+                try:
+                    return int(token)
+                except ValueError:
+                    continue
+            return default
+
+        def extract_pid(output: str) -> str:
+            for token in reversed(output.split()):
+                if token.isdigit():
+                    return token
+            return ""
+
+        # Wakeup / prompt check
+        exec_cmd("\n", 0.5)
+
+        # 1. Verify Ramoops and Kernel Panic Configuration (OS-008, OS-007)
+        print("[HIL-RAM-OOM] Checking ramoops initialization in dmesg...")
+        dmesg_ramoops = exec_cmd("dmesg | grep -i ramoops")
+        if "Registered ramoops as persistent store backend" not in dmesg_ramoops:
+            print(f"[FAIL] Ramoops driver not registered in dmesg:\n{dmesg_ramoops}")
+            return False
+        print("  -> Ramoops backend registered cleanly.")
+
+        panic_out = exec_cmd("cat /proc/sys/kernel/panic")
+        panic_timeout = extract_int(panic_out, 0)
+        print(f"[HIL-RAM-OOM] Kernel panic reboot timeout: {panic_timeout}s")
+        if panic_timeout <= 0:
+            print(f"[FAIL] Kernel panic timeout is not greater than 0 (got: {panic_out})")
+            return False
+
+        # 2. Verify Crash Harvest Reports in /data/crashes (OS-008, STO-010)
+        print("[HIL-RAM-OOM] Checking /data/crashes for harvested crash reports...")
+        crash_list = exec_cmd("ls --color=never -1 /data/crashes/ 2>/dev/null").strip()
+        reports = [line.strip() for line in crash_list.splitlines() if line.strip().startswith("crash_") and line.strip().endswith(".txt")]
+        report_count = len(reports)
+        print(f"  -> Found {report_count} crash report(s) in /data/crashes (max 20).")
+        if report_count == 0 or report_count > 20:
+            print(f"[FAIL] Crash report count {report_count} invalid (must be between 1 and 20)")
+            return False
+
+        # 3. Verify Compressed RAM Swap (OS-009)
+        print("[HIL-RAM-OOM] Checking zram swap configuration (/proc/swaps)...")
+        swaps = exec_cmd("cat /proc/swaps")
+        if "/dev/zram0" not in swaps:
+            print(f"[FAIL] /dev/zram0 not active in /proc/swaps:\n{swaps}")
+            return False
+        for prohibited in ["/dev/sda", "/dev/mmcblk", "/dev/nvme"]:
+            if prohibited in swaps:
+                print(f"[FAIL] Prohibited persistent swap active on {prohibited}:\n{swaps}")
+                return False
+        print("  -> /dev/zram0 is active and no persistent storage swap exists.")
+
+        # 4. Verify Process OOM Scores and Supervision (OS-006, OS-009)
+        print("[HIL-RAM-OOM] Checking renderer and agent OOM priority scores...")
+        render_pid = extract_pid(exec_cmd("pidof chalkboard-render"))
+        agent_pid = extract_pid(exec_cmd("pidof chalkboard-agent"))
+        print(f"  -> Renderer PID: {render_pid}, Agent PID: {agent_pid}")
+
+        if not render_pid or not agent_pid:
+            print("[FAIL] Could not locate running PID for chalkboard-render or chalkboard-agent")
+            return False
+
+        render_adj = extract_int(exec_cmd(f"cat /proc/{render_pid}/oom_score_adj"))
+        agent_adj = extract_int(exec_cmd(f"cat /proc/{agent_pid}/oom_score_adj"))
+        print(f"  -> Renderer oom_score_adj: {render_adj} (expected -900)")
+        print(f"  -> Agent oom_score_adj: {agent_adj} (expected 0)")
+
+        if render_adj != -900:
+            print(f"[FAIL] Renderer oom_score_adj is {render_adj}, expected -900")
+            return False
+        if agent_adj != 0:
+            print(f"[FAIL] Agent oom_score_adj is {agent_adj}, expected 0")
+            return False
+
+        # 5. Verify Supervisor Restart Within 1s
+        print("[HIL-RAM-OOM] Verifying agent supervisor restart within 1s...")
+        exec_cmd(f"kill -9 {agent_pid}")
+        time.sleep(1.0)
+        new_agent_pid = extract_pid(exec_cmd("pidof chalkboard-agent"))
+        print(f"  -> Killed PID {agent_pid}; new PID is {new_agent_pid}")
+        if new_agent_pid == agent_pid or not new_agent_pid:
+            print("[FAIL] Agent was not restarted by supervisor within 1s")
+            return False
+
+        print("[HIL-RAM-OOM] All hardware-in-the-loop tests passed successfully! Ni!")
+        return True
+    finally:
+        os.close(fd)
+
+
+def main():
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="Chalkboard RAM logging, crash capture, zram and OOM validator")
+    parser.add_argument("--serial-port", help="Serial port device node for live HIL verification")
+    parser.add_argument("--baud", type=int, default=115200, help="Serial baud rate [default: 115200]")
+    args = parser.parse_args()
+
+    if args.serial_port:
+        success = run_hil_ram_logging_oom_verification(args.serial_port, args.baud)
+        sys.exit(0 if success else 1)
+    else:
+        suite = unittest.TestLoader().loadTestsFromTestCase(TestRamLoggingAndOom)
+        runner = unittest.TextTestRunner(verbosity=2)
+        result = runner.run(suite)
+        sys.exit(0 if result.wasSuccessful() else 1)
+
 
 if __name__ == "__main__":
-    unittest.main()
+    main()

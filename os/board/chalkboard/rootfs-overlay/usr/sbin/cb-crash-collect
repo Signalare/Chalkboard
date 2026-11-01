@@ -27,7 +27,28 @@ fi
 
 mkdir -p "$CRASH_DIR"
 
-# 3. Check for crash files in pstore
+# 3. Prune older crash reports to enforce max 20 reports (OS-008)
+prune_old_reports() {
+  local dir="$1"
+  local max="$2"
+
+  total=$(ls -1 "$dir"/crash_*.txt 2>/dev/null | wc -l)
+  if [ "$total" -gt "$max" ]; then
+    excess=$(( total - max ))
+    echo "cb-crash-collect: Pruning $excess old crash report(s) to enforce limit of $max."
+
+    # Sort oldest first by mtime (ls -tr) and remove excess
+    ls -1tr "$dir"/crash_*.txt 2>/dev/null | head -n "$excess" | while IFS= read -r old_file; do
+      if [ -n "$old_file" ] && [ -f "$old_file" ]; then
+        rm -f "$old_file"
+      fi
+    done
+  fi
+}
+
+prune_old_reports "$CRASH_DIR" "$MAX_REPORTS"
+
+# 4. Check for crash files in pstore
 found_files=""
 for f in "$PSTORE_DIR"/dmesg-* "$PSTORE_DIR"/console-* "$PSTORE_DIR"/pmsg-*; do
   if [ -f "$f" ]; then
@@ -64,23 +85,5 @@ report_file="${CRASH_DIR}/crash_${timestamp}.txt"
 
 echo "cb-crash-collect: Saved crash report to $report_file"
 
-# 4. Prune older crash reports to enforce max 20 reports (OS-008)
-prune_old_reports() {
-  local dir="$1"
-  local max="$2"
-
-  total=$(ls -1 "$dir"/crash_*.txt 2>/dev/null | wc -l)
-  if [ "$total" -gt "$max" ]; then
-    excess=$(( total - max ))
-    echo "cb-crash-collect: Pruning $excess old crash report(s) to enforce limit of $max."
-
-    # Sort oldest first by mtime (ls -tr) and remove excess
-    ls -1tr "$dir"/crash_*.txt 2>/dev/null | head -n "$excess" | while IFS= read -r old_file; do
-      if [ -n "$old_file" ] && [ -f "$old_file" ]; then
-        rm -f "$old_file"
-      fi
-    done
-  fi
-}
-
+# 5. Prune again after new report creation
 prune_old_reports "$CRASH_DIR" "$MAX_REPORTS"
