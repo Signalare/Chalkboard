@@ -9,6 +9,7 @@
   let currentTab = $state<Tab>('sold-out');
   let status = $state<NodeStatus | null>(null);
   let cecStatus = $state<CecStatus | null>(null);
+  let openCecMenuId = $state<string | null>(null);
   let categories = $state<Category[]>([]);
   let items = $state<Item[]>([]);
   let templates = $state<Template[]>([]);
@@ -243,6 +244,12 @@
     return cat ? cat.title : catId;
   }
 </script>
+
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key === 'Escape') openCecMenuId = null;
+  }}
+/>
 
 <div class="app-layout">
   <header class="app-header">
@@ -898,60 +905,74 @@
           </div>
         {/if}
 
-        {#if cecStatus}
-          <div class="cec-control-panel">
-            <div class="cec-header">
-              <div>
-                <h3>HDMI-CEC Display Control</h3>
-                <p class="section-sub">
-                  Direct hardware and simulated display power management (CEC-001..CEC-005).
-                </p>
-              </div>
-              <div class="cec-badges">
-                {#if cecStatus.is_mock}
-                  <span class="badge-mock" title="Running in simulated offline mode (#25)"
-                    >Mock Hardware Device</span
-                  >
-                {/if}
-                <span
-                  class="status-pill"
-                  class:pill-success={cecStatus.primary_power === 'on'}
-                  class:pill-danger={cecStatus.primary_power === 'standby'}
-                >
-                  TV: {cecStatus.primary_power.toUpperCase()}
-                </span>
-              </div>
-            </div>
-
-            <div class="cec-actions">
-              <button type="button" class="btn btn-primary" onclick={() => handleCecAction('on')}>
-                ⚡ Power On TV & Take Input
-              </button>
-              <button
-                type="button"
-                class="btn btn-secondary"
-                onclick={() => handleCecAction('active-source')}
-              >
-                📺 Re-assert Active Source
-              </button>
-              <button
-                type="button"
-                class="btn btn-danger"
-                onclick={() => handleCecAction('standby')}
-              >
-                💤 TV Standby
-              </button>
-            </div>
-          </div>
-        {/if}
-
         <div class="screens-overview">
           <h3>Connected Displays</h3>
           <div class="screens-grid">
             {#each screens as scr (scr.id)}
               <div class="screen-card">
                 <div class="screen-meta">
-                  <h4>{scr.name}</h4>
+                  <div class="screen-title-row">
+                    <h4>{scr.name}</h4>
+                    {#if cecStatus}
+                      <div class="cec-badge-wrapper">
+                        <button
+                          type="button"
+                          class="cec-status-badge"
+                          class:is-on={cecStatus.primary_power === 'on'}
+                          class:is-standby={cecStatus.primary_power === 'standby'}
+                          onclick={() => (openCecMenuId = openCecMenuId === scr.id ? null : scr.id)}
+                          aria-haspopup="true"
+                          aria-expanded={openCecMenuId === scr.id}
+                        >
+                          <span class="cec-dot"></span>
+                          TV: {cecStatus.primary_power.toUpperCase()}
+                          {#if cecStatus.is_mock}
+                            <span class="cec-mock-tag">mock</span>
+                          {/if}
+                          <span class="cec-chevron" aria-hidden="true">▾</span>
+                        </button>
+
+                        {#if openCecMenuId === scr.id}
+                          <div class="cec-dropdown" role="menu">
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class="cec-dropdown-item"
+                              onclick={() => {
+                                void handleCecAction('on');
+                                openCecMenuId = null;
+                              }}
+                            >
+                              ⚡ Power On & Take Input
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class="cec-dropdown-item"
+                              onclick={() => {
+                                void handleCecAction('active-source');
+                                openCecMenuId = null;
+                              }}
+                            >
+                              📺 Re-assert Active Source
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              class="cec-dropdown-item item-danger"
+                              onclick={() => {
+                                void handleCecAction('standby');
+                                openCecMenuId = null;
+                              }}
+                            >
+                              💤 TV Standby
+                            </button>
+                          </div>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
                   <p class="screen-res">{scr.logical_width} × {scr.logical_height} px</p>
                   <p class="screen-rot">Orientation: <strong>{scr.rotation}°</strong></p>
                   <p class="screen-mode">Sold-out mode: <code>{scr.sold_out_mode}</code></p>
@@ -1576,55 +1597,135 @@
     margin: 0.2rem 0;
   }
 
-  /* CEC Panel (#25, CEC-001..CEC-006) */
-  .cec-control-panel {
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    margin-block-end: 2rem;
-  }
-
-  .cec-header {
+  /* CEC Minimalist Badge & Dropdown (#25, CEC-001..CEC-006) */
+  .screen-title-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-block-end: 1rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    margin-block-end: 0.25rem;
   }
 
-  .cec-header h3 {
+  .screen-title-row h4 {
     margin: 0;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
   }
 
-  .cec-badges {
-    display: flex;
+  .cec-badge-wrapper {
+    position: relative;
+    display: inline-block;
+  }
+
+  .cec-status-badge {
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-  }
-
-  .badge-mock {
-    font-size: 0.75rem;
+    gap: 0.35rem;
+    font-size: 0.72rem;
     font-weight: 600;
-    padding-inline: 0.5rem;
+    padding-inline: 0.55rem;
     padding-block: 0.2rem;
     border-radius: 9999px;
-    background-color: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
+    border: 1px solid var(--border-color);
+    background-color: #f1f5f9;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
   }
 
-  .pill-success {
+  .cec-status-badge:hover {
+    border-color: #94a3b8;
+  }
+
+  .cec-status-badge.is-on {
     background-color: #dcfce7;
     color: #166534;
+    border-color: #bbf7d0;
   }
 
-  .cec-actions {
+  .cec-status-badge.is-on .cec-dot {
+    background-color: #16a34a;
+  }
+
+  .cec-status-badge.is-standby {
+    background-color: #f1f5f9;
+    color: #64748b;
+  }
+
+  .cec-status-badge.is-standby .cec-dot {
+    background-color: #94a3b8;
+  }
+
+  .cec-dot {
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background-color: currentColor;
+  }
+
+  .cec-mock-tag {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background-color: #fef3c7;
+    color: #92400e;
+    padding-inline: 0.25rem;
+    border-radius: 3px;
+    margin-inline-start: 0.1rem;
+  }
+
+  .cec-chevron {
+    font-size: 0.65rem;
+    opacity: 0.7;
+  }
+
+  .cec-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-inline-size: 210px;
+    background-color: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow:
+      0 10px 15px -3px rgba(0, 0, 0, 0.1),
+      0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    z-index: 50;
+    padding-block: 0.35rem;
     display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+  }
+
+  .cec-dropdown-item {
+    background: none;
+    border: none;
+    text-align: left;
+    padding-inline: 0.85rem;
+    padding-block: 0.45rem;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: background-color 0.1s ease;
+  }
+
+  .cec-dropdown-item:hover {
+    background-color: #f8fafc;
+  }
+
+  .cec-dropdown-item.item-danger {
+    color: var(--danger);
+  }
+
+  .cec-dropdown-item.item-danger:hover {
+    background-color: #fef2f2;
+  }
+
+  .dropdown-divider {
+    block-size: 1px;
+    background-color: var(--border-color);
+    margin-block: 0.25rem;
   }
 
   /* Screens & Playlist */
