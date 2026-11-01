@@ -31,12 +31,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "  --mock-hardware    Enable mock hardware adapters for offline development (#25)"
         );
+        println!(
+            "  --detect-board     Detect and print hardware board capabilities as JSON (HW-009)"
+        );
         println!("  --version, -V      Print version banner");
         println!("  --help, -h         Print help information");
         return Ok(());
     }
-
-    println!("{}", banner());
 
     let mut bind_addr = "127.0.0.1:8080".to_string();
     let mut db_path = "build/data/chalkboard.db".to_string();
@@ -75,6 +76,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    if args.iter().any(|a| a == "--detect-board") {
+        let caps = if mock_hardware {
+            chalkboard_agent::board::BoardCapabilities {
+                model: chalkboard_agent::board::BoardModel::Pi4B,
+                model_name: "Raspberry Pi 4 Model B (Mock)".to_string(),
+                revision_code: 0x00c0_3111,
+                support_tier: chalkboard_agent::board::SupportTier::Tier1,
+                soc_family: chalkboard_agent::board::SocFamily::Bcm2711,
+                ram_mb: 4096,
+                hdmi_outputs: 2,
+                wifi_bands: chalkboard_agent::board::WifiBands::DualBand,
+                has_ethernet: true,
+                has_rtc: false,
+                boot_device: chalkboard_agent::board::BootDeviceType::MicroSd,
+            }
+        } else {
+            match chalkboard_agent::board::detect() {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Board detection failed: {e}");
+                    std::process::exit(1);
+                }
+            }
+        };
+        println!("{}", serde_json::to_string_pretty(&caps)?);
+        return Ok(());
+    }
+
+    println!("{}", banner());
+
     if let Some(parent) = Path::new(&db_path).parent() {
         fs::create_dir_all(parent)?;
     }
@@ -89,6 +120,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cec_service.primary().device_name(),
         cec_service.primary().is_mock()
     );
+
+    let _board_caps = if mock_hardware {
+        println!("Board detection: mock hardware mode (desktop development)");
+        None
+    } else {
+        match chalkboard_agent::board::detect() {
+            Ok(caps) => {
+                println!(
+                    "Detected board: {} ({}, {}, {} MB RAM, {} HDMI, {}, Ethernet: {}, RTC: {}, boot: {})",
+                    caps.model_name,
+                    caps.support_tier,
+                    caps.soc_family,
+                    caps.ram_mb,
+                    caps.hdmi_outputs,
+                    caps.wifi_bands,
+                    caps.has_ethernet,
+                    caps.has_rtc,
+                    caps.boot_device
+                );
+                Some(caps)
+            }
+            Err(e) => {
+                println!("Board detection fallback: {e}");
+                None
+            }
+        }
+    };
 
     let server = HttpServer::start(
         &bind_addr,
