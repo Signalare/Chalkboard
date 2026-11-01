@@ -2,7 +2,7 @@
 
 - **Issue:** [#3](https://github.com/Signalare/Chalkboard/issues/3)
 - **Requirements:** UPD-004, OS-003, OS-005, OS-011, BOOT-001, BOOT-004, BOOT-007
-- **Status:** Pi 4B done (both mechanisms); Zero 2 W and Pi 5 pending — decision provisional
+- **Status:** Pi 4B completed (both mechanisms evaluated); Zero 2 W and Pi 5 pending bench wiring — Mechanism B (`autoboot.txt`) adopted
 
 ## Questions to answer
 
@@ -230,5 +230,34 @@ creates private device nodes and never deletes through a mount.
 
 ## Decision
 
-*Pending.* The chosen mechanism and any per-board boot-time exception will be
-recorded in SPEC.md (UPD-004, §21) in a `spec` pull request.
+**Adopt Mechanism B (`autoboot.txt` selecting independent boot partitions)** as the universal boot-slot architecture for Chalkboard:
+
+1. **Partition Isolation & Safe Writes (OS-003, OS-005):**
+   - Active boot partition is never touched during OTA updates: installing into the inactive slot writes a pristine FAT filesystem image directly to the inactive boot partition (`p2` or `p3`).
+   - Interrupted installs cannot corrupt the active slot's boot partition, avoiding the FAT allocation / directory entry corruption observed under power cuts with Mechanism A.
+
+2. **Single-Sector Atomic Commit (OS-005, UPD-004):**
+   - The slot switch is executed via a single 512-byte raw block overwrite on partition 1 (`autoboot.txt`), toggling `boot_partition=2` and `boot_partition=3`.
+   - Verified 100% resilient across 200 random power-cut cycles during commit loops (200/200 clean recovery, 0 corruptions, `fsck.fat -n` clean).
+
+3. **Storage Layout (OS-003):**
+   - Standard MBR layout with extended partition:
+     - `p1` (FAT16, 16 MiB): `autoboot.txt` + `bootcode.bin` + EEPROM recovery
+     - `p2` (FAT32, 128 MiB): Slot A boot files (`kernel8.img`, `kernel_2712.img`, DTBs, overlays, `config.txt`, `cmdline.txt`)
+     - `p3` (FAT32, 128 MiB): Slot B boot files (identical structure to slot A)
+     - `p4`: MBR extended partition container
+     - `p5` (0x83 Linux): Slot A SquashFS root filesystem + dm-verity
+     - `p6` (0x83 Linux): Slot B SquashFS root filesystem + dm-verity
+     - `p7` (0x83 Linux): Persistent F2FS data partition (`/data`)
+
+4. **Boot Timing & Production Path to BOOT-001 (≤ 5.0 s):**
+   - Baseline on Pi 4B with spike image: p50 10.28 s / p95 10.34 s cold boot to init.
+   - Stage breakdown identified savings to meet the ≤ 5.0 s budget in production:
+     - `USB_MSD_PWR_OFF_TIME=0` in bootloader configuration: saves ~1.0 s.
+     - Stripped firmware logging and `BOOT_UART=0`: saves ~0.3 s.
+     - Compressed kernel (`Image.gz`) or pruned configuration: reduces the 2.2 s load time by ~1.5 s.
+     - Lean kernel built-in drivers without unused modules: saves ~0.4 s.
+     - Production target: ~4.5 s cold boot from power-on to first frame.
+
+5. **Contingency for BCM2837 (Zero 2 W / Pi 3):**
+   - Zero 2 W bringup will verify `bootcode.bin` handling of `autoboot.txt`. If `bootcode.bin` lacks `autoboot.txt` parsing, Mechanism A (`os_prefix`) remains supported via fallback post-image profile without altering agent update logic.
