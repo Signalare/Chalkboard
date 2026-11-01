@@ -9,14 +9,18 @@
 #include <drm/drm_mode.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "chalkboard/render.h"
 
@@ -43,6 +47,83 @@ static int drm_xioctl(int fd, unsigned long request, void *arg)
         ret = ioctl(fd, request, arg);
     } while (ret == -1 && (errno == EINTR || errno == EAGAIN));
     return ret;
+}
+
+static int drm_find_output(int fd, cb_drm_output_t *drm)
+{
+    struct drm_mode_card_res res = {0};
+    uint32_t *conn_ids = NULL;
+    uint32_t *crtc_ids = NULL;
+    uint32_t *enc_ids = NULL;
+    int found = -1;
+
+    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res) != 0 || res.count_connectors == 0 || res.count_crtcs == 0) {
+        return -1;
+    }
+    conn_ids = (uint32_t *)calloc(res.count_connectors, sizeof(*conn_ids));
+    crtc_ids = (uint32_t *)calloc(res.count_crtcs, sizeof(*crtc_ids));
+    enc_ids = (uint32_t *)calloc(res.count_encoders ? res.count_encoders : 1U, sizeof(*enc_ids));
+    if (conn_ids == NULL || crtc_ids == NULL || enc_ids == NULL) {
+        goto done;
+    }
+    res.connector_id_ptr = (uint64_t)(uintptr_t)conn_ids;
+    res.crtc_id_ptr = (uint64_t)(uintptr_t)crtc_ids;
+    res.encoder_id_ptr = (uint64_t)(uintptr_t)enc_ids;
+    res.count_fbs = 0;
+    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res) != 0) {
+        goto done;
+    }
+
+    for (uint32_t i = 0; i < res.count_connectors && found != 0; i++) {
+        struct drm_mode_get_connector conn = {.connector_id = conn_ids[i]};
+        struct drm_mode_modeinfo *modes;
+        uint32_t *encoders;
+
+        if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) != 0 || conn.connection != 1 || conn.count_modes == 0) {
+            continue;
+        }
+        modes = (struct drm_mode_modeinfo *)calloc(conn.count_modes, sizeof(*modes));
+        encoders = (uint32_t *)calloc(conn.count_encoders ? conn.count_encoders : 1U, sizeof(*encoders));
+        if (modes == NULL || encoders == NULL) {
+            free(modes);
+            free(encoders);
+            continue;
+        }
+        conn.modes_ptr = (uint64_t)(uintptr_t)modes;
+        conn.encoders_ptr = (uint64_t)(uintptr_t)encoders;
+        conn.count_props = 0;
+        if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) == 0) {
+            drm->mode = modes[0];
+            for (uint32_t m = 0; m < conn.count_modes; m++) {
+                if (modes[m].type & DRM_MODE_TYPE_PREFERRED) {
+                    drm->mode = modes[m];
+                    break;
+                }
+            }
+            for (uint32_t e = 0; e < conn.count_encoders && found != 0; e++) {
+                struct drm_mode_get_encoder enc = {.encoder_id = encoders[e]};
+                if (drm_xioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc) != 0) {
+                    continue;
+                }
+                for (uint32_t c = 0; c < res.count_crtcs; c++) {
+                    if (enc.possible_crtcs & (1U << c)) {
+                        drm->connector_id = conn.connector_id;
+                        drm->crtc_id = crtc_ids[c];
+                        found = 0;
+                        break;
+                    }
+                }
+            }
+        }
+        free(modes);
+        free(encoders);
+    }
+
+done:
+    free(conn_ids);
+    free(crtc_ids);
+    free(enc_ids);
+    return found;
 }
 
 static int drm_setup_dumb_fb(cb_drm_output_t *drm)
@@ -156,12 +237,111 @@ static int run_headless_once(const char *snapshots_dir, const char *node_name)
     return 0;
 }
 
+static int benchmark_transitions(void)
+{
+    cb_transition_t transitions[] = {CB_TRANSITION_CUT, CB_TRANSITION_FADE, CB_TRANSITION_SLIDE};
+    const char *trans_names[] = {"cut", "fade", "slide"};
+    cb_rotation_t rotations[] = {CB_ROTATION_0, CB_ROTATION_90, CB_ROTATION_180, CB_ROTATION_270};
+    int rot_angles[] = {0, 90, 180, 270};
+
+    const uint32_t num_frames = 100U;
+    const uint32_t duration_ms = 300U;
+    int ret = 0;
+
+    printf("=== Chalkboard Renderer Benchmark (1080p, target >= 30 fps) ===\n");
+
+    for (size_t t = 0; t < 3; t++) {
+        for (size_t r = 0; r < 4; r++) {
+            uint32_t rw = (rotations[r] == CB_ROTATION_90 || rotations[r] == CB_ROTATION_270) ? CB_DEFAULT_HEIGHT
+                                                                                              : CB_DEFAULT_WIDTH;
+            uint32_t rh = (rotations[r] == CB_ROTATION_90 || rotations[r] == CB_ROTATION_270) ? CB_DEFAULT_WIDTH
+                                                                                              : CB_DEFAULT_HEIGHT;
+            cb_surface_t s_from;
+            cb_surface_t s_to;
+            cb_surface_t s_dest;
+            struct timespec t_start;
+            struct timespec t_end;
+            double total_sec;
+            double fps;
+            double ms_per_frame;
+            bool pass;
+
+            if (cb_surface_init(&s_from, rw, rh) != CB_RENDER_OK || cb_surface_init(&s_to, rw, rh) != CB_RENDER_OK ||
+                cb_surface_init(&s_dest, rw, rh) != CB_RENDER_OK) {
+                (void)fputs("Failed to allocate benchmark surfaces\n", stderr);
+                return 1;
+            }
+            cb_surface_clear(&s_from, 0x0014110fU);
+            cb_surface_clear(&s_to, 0x00f2c14eU);
+
+            clock_gettime(CLOCK_MONOTONIC, &t_start);
+
+            for (uint32_t f = 0; f < num_frames; f++) {
+                uint32_t elapsed_ms = (f * duration_ms) / num_frames;
+                cb_surface_transition(&s_dest, &s_from, &s_to, transitions[t], elapsed_ms, duration_ms);
+            }
+
+            clock_gettime(CLOCK_MONOTONIC, &t_end);
+            cb_surface_free(&s_from);
+            cb_surface_free(&s_to);
+            cb_surface_free(&s_dest);
+
+            total_sec = (double)(t_end.tv_sec - t_start.tv_sec) + (((double)(t_end.tv_nsec - t_start.tv_nsec)) / 1e9);
+            fps = (double)num_frames / total_sec;
+            ms_per_frame = (total_sec * 1000.0) / (double)num_frames;
+
+            pass = (fps >= 30.0);
+            printf("BENCHMARK transition=%-5s rotation=%-3d frames=%u total_ms=%.1f ms/frame=%.2f fps=%.1f result=%s\n",
+                   trans_names[t], rot_angles[r], num_frames, total_sec * 1000.0, ms_per_frame, fps,
+                   pass ? "PASS" : "FAIL");
+            if (!pass) {
+                ret = 1;
+            }
+        }
+    }
+    return ret;
+}
+
+static int benchmark_first_frame(void)
+{
+    cb_renderer_t renderer;
+    struct timespec t_start;
+    struct timespec t_end;
+    double first_frame_ms;
+    bool ff_pass;
+
+    clock_gettime(CLOCK_MONOTONIC, &t_start);
+    if (cb_renderer_init(&renderer, CB_DEFAULT_WIDTH, CB_DEFAULT_HEIGHT, "bench-node") != CB_RENDER_OK) {
+        return 1;
+    }
+    (void)cb_renderer_render_frame(&renderer, 0ULL);
+    clock_gettime(CLOCK_MONOTONIC, &t_end);
+    first_frame_ms =
+        ((double)(t_end.tv_sec - t_start.tv_sec) + (((double)(t_end.tv_nsec - t_start.tv_nsec)) / 1e9)) * 1000.0;
+    ff_pass = (first_frame_ms <= 1000.0);
+    printf("BENCHMARK first_frame mode=%d time_ms=%.2f budget_ms=1000.0 result=%s\n", (int)renderer.mode,
+           first_frame_ms, ff_pass ? "PASS" : "FAIL");
+    cb_renderer_free(&renderer);
+    return ff_pass ? 0 : 1;
+}
+
+static int run_benchmark(void)
+{
+    int ret = benchmark_transitions();
+    if (benchmark_first_frame() != 0) {
+        ret = 1;
+    }
+    return ret;
+}
+
 int main(int argc, char **argv)
 {
     const char *snapshots_dir = "/data/snapshots";
     const char *node_name = "chalkboard-node";
     bool headless_once = false;
     bool try_drm = false;
+    bool daemon_mode = false;
+    bool run_bench = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--version") == 0) {
@@ -178,7 +358,15 @@ int main(int argc, char **argv)
             headless_once = true;
         } else if (strcmp(argv[i], "--drm") == 0) {
             try_drm = true;
+        } else if (strcmp(argv[i], "--daemon") == 0) {
+            daemon_mode = true;
+        } else if (strcmp(argv[i], "--benchmark") == 0) {
+            run_bench = true;
         }
+    }
+
+    if (run_bench) {
+        return run_benchmark();
     }
 
     if (headless_once) {
@@ -188,21 +376,61 @@ int main(int argc, char **argv)
 #ifdef __linux__
     if (try_drm) {
         cb_drm_output_t drm_out;
+        int found_card = -1;
+
         memset(&drm_out, 0, sizeof(drm_out));
-        drm_out.fd = open("/dev/dri/card0", O_RDWR);
-        if (drm_out.fd >= 0 && drm_setup_dumb_fb(&drm_out) == 0) {
+        drm_out.fd = -1;
+
+        for (int c = 0; c < 8; c++) {
+            char path[32];
+            int fd;
+
+            (void)snprintf(path, sizeof(path), "/dev/dri/card%d", c);
+            fd = open(path, O_RDWR);
+            if (fd < 0) {
+                continue;
+            }
+            if (drm_find_output(fd, &drm_out) == 0) {
+                drm_out.fd = fd;
+                found_card = c;
+                break;
+            }
+            (void)close(fd);
+        }
+
+        if (found_card >= 0 && drm_setup_dumb_fb(&drm_out) == 0) {
             cb_renderer_t renderer;
+            printf("DRM output initialized on card%d: %ux%u connector=%u crtc=%u\n", found_card, drm_out.width,
+                   drm_out.height, drm_out.connector_id, drm_out.crtc_id);
+
             if (cb_renderer_init(&renderer, drm_out.width, drm_out.height, node_name) == CB_RENDER_OK) {
                 (void)cb_renderer_load_from_store(&renderer, snapshots_dir, 0ULL);
                 (void)cb_renderer_render_frame(&renderer, 0ULL);
                 drm_present_surface(&drm_out, &renderer.frame);
+                if (daemon_mode) {
+                    while (1) {
+                        (void)sleep(1);
+                    }
+                }
                 cb_renderer_free(&renderer);
             }
+            drm_close_output(&drm_out);
+        } else {
+            /* Headless / disconnected fallback */
+            if (daemon_mode) {
+                while (1) {
+                    (void)sleep(1);
+                }
+            }
         }
-        drm_close_output(&drm_out);
     }
 #else
     (void)try_drm;
+    if (daemon_mode) {
+        while (1) {
+            (void)sleep(1);
+        }
+    }
 #endif
 
     printf("chalkboard-render %s\n", cb_render_version());

@@ -1,3 +1,4 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 source "$BR2_EXTERNAL_CHALKBOARD_PATH/package/cb-spike-tools/Config.in"
 source "$BR2_EXTERNAL_CHALKBOARD_PATH/package/cb-rpi-eeprom/Config.in"
+source "$BR2_EXTERNAL_CHALKBOARD_PATH/package/chalkboard-render/Config.in"

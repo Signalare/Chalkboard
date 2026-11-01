@@ -5,7 +5,10 @@
 
 set -eu
 
-RENDERER_BIN="/usr/bin/chalkboard-render"
+RENDERER_BIN="${RENDERER_BIN:-/usr/bin/chalkboard-render}"
+if [ ! -x "$RENDERER_BIN" ] && [ -x "/tmp/bin/chalkboard-render" ]; then
+  RENDERER_BIN="/tmp/bin/chalkboard-render"
+fi
 OOM_PROTECTED_SCORE="-900"
 
 if [ ! -x "$RENDERER_BIN" ]; then
