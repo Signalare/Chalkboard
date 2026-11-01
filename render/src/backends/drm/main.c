@@ -11,7 +11,6 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <unistd.h>
 #endif
 
 #include <stdbool.h>
@@ -49,12 +48,67 @@ static int drm_xioctl(int fd, unsigned long request, void *arg)
     return ret;
 }
 
+static int find_crtc_for_encoder(int fd, uint32_t enc_id, const uint32_t *crtc_ids, uint32_t count_crtcs,
+                                 uint32_t *out_crtc)
+{
+    struct drm_mode_get_encoder enc = {.encoder_id = enc_id};
+    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc) != 0) {
+        return -1;
+    }
+    for (uint32_t c = 0; c < count_crtcs; c++) {
+        if (enc.possible_crtcs & (1U << c)) {
+            *out_crtc = crtc_ids[c];
+            return 0;
+        }
+    }
+    return -1;
+}
+
+static int try_connector(int fd, uint32_t conn_id, const uint32_t *crtc_ids, uint32_t count_crtcs, cb_drm_output_t *drm)
+{
+    struct drm_mode_get_connector conn = {.connector_id = conn_id};
+    struct drm_mode_modeinfo *modes = NULL;
+    uint32_t *encoders = NULL;
+    int ret = -1;
+
+    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) != 0 || conn.connection != 1 || conn.count_modes == 0) {
+        return -1;
+    }
+    modes = (struct drm_mode_modeinfo *)calloc(conn.count_modes, sizeof(*modes));
+    encoders = (uint32_t *)calloc(conn.count_encoders ? conn.count_encoders : 1U, sizeof(*encoders));
+    if (modes == NULL || encoders == NULL) {
+        free(modes);
+        free(encoders);
+        return -1;
+    }
+    conn.modes_ptr = (uint64_t)(uintptr_t)modes;
+    conn.encoders_ptr = (uint64_t)(uintptr_t)encoders;
+    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) == 0) {
+        drm->mode = modes[0];
+        for (uint32_t m = 0; m < conn.count_modes; m++) {
+            if (modes[m].type & DRM_MODE_TYPE_PREFERRED) {
+                drm->mode = modes[m];
+                break;
+            }
+        }
+        for (uint32_t e = 0; e < conn.count_encoders; e++) {
+            if (find_crtc_for_encoder(fd, encoders[e], crtc_ids, count_crtcs, &drm->crtc_id) == 0) {
+                drm->connector_id = conn.connector_id;
+                ret = 0;
+                break;
+            }
+        }
+    }
+    free(modes);
+    free(encoders);
+    return ret;
+}
+
 static int drm_find_output(int fd, cb_drm_output_t *drm)
 {
     struct drm_mode_card_res res = {0};
     uint32_t *conn_ids = NULL;
     uint32_t *crtc_ids = NULL;
-    uint32_t *enc_ids = NULL;
     int found = -1;
 
     if (drm_xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res) != 0 || res.count_connectors == 0 || res.count_crtcs == 0) {
@@ -62,67 +116,23 @@ static int drm_find_output(int fd, cb_drm_output_t *drm)
     }
     conn_ids = (uint32_t *)calloc(res.count_connectors, sizeof(*conn_ids));
     crtc_ids = (uint32_t *)calloc(res.count_crtcs, sizeof(*crtc_ids));
-    enc_ids = (uint32_t *)calloc(res.count_encoders ? res.count_encoders : 1U, sizeof(*enc_ids));
-    if (conn_ids == NULL || crtc_ids == NULL || enc_ids == NULL) {
-        goto done;
+    if (conn_ids == NULL || crtc_ids == NULL) {
+        free(conn_ids);
+        free(crtc_ids);
+        return -1;
     }
     res.connector_id_ptr = (uint64_t)(uintptr_t)conn_ids;
     res.crtc_id_ptr = (uint64_t)(uintptr_t)crtc_ids;
-    res.encoder_id_ptr = (uint64_t)(uintptr_t)enc_ids;
-    res.count_fbs = 0;
-    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res) != 0) {
-        goto done;
-    }
-
-    for (uint32_t i = 0; i < res.count_connectors && found != 0; i++) {
-        struct drm_mode_get_connector conn = {.connector_id = conn_ids[i]};
-        struct drm_mode_modeinfo *modes;
-        uint32_t *encoders;
-
-        if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) != 0 || conn.connection != 1 || conn.count_modes == 0) {
-            continue;
-        }
-        modes = (struct drm_mode_modeinfo *)calloc(conn.count_modes, sizeof(*modes));
-        encoders = (uint32_t *)calloc(conn.count_encoders ? conn.count_encoders : 1U, sizeof(*encoders));
-        if (modes == NULL || encoders == NULL) {
-            free(modes);
-            free(encoders);
-            continue;
-        }
-        conn.modes_ptr = (uint64_t)(uintptr_t)modes;
-        conn.encoders_ptr = (uint64_t)(uintptr_t)encoders;
-        conn.count_props = 0;
-        if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) == 0) {
-            drm->mode = modes[0];
-            for (uint32_t m = 0; m < conn.count_modes; m++) {
-                if (modes[m].type & DRM_MODE_TYPE_PREFERRED) {
-                    drm->mode = modes[m];
-                    break;
-                }
-            }
-            for (uint32_t e = 0; e < conn.count_encoders && found != 0; e++) {
-                struct drm_mode_get_encoder enc = {.encoder_id = encoders[e]};
-                if (drm_xioctl(fd, DRM_IOCTL_MODE_GETENCODER, &enc) != 0) {
-                    continue;
-                }
-                for (uint32_t c = 0; c < res.count_crtcs; c++) {
-                    if (enc.possible_crtcs & (1U << c)) {
-                        drm->connector_id = conn.connector_id;
-                        drm->crtc_id = crtc_ids[c];
-                        found = 0;
-                        break;
-                    }
-                }
+    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res) == 0) {
+        for (uint32_t i = 0; i < res.count_connectors; i++) {
+            if (try_connector(fd, conn_ids[i], crtc_ids, res.count_crtcs, drm) == 0) {
+                found = 0;
+                break;
             }
         }
-        free(modes);
-        free(encoders);
     }
-
-done:
     free(conn_ids);
     free(crtc_ids);
-    free(enc_ids);
     return found;
 }
 
@@ -334,6 +344,59 @@ static int run_benchmark(void)
     return ret;
 }
 
+#ifdef __linux__
+static int run_drm(const char *snapshots_dir, const char *node_name, bool daemon_mode)
+{
+    cb_drm_output_t drm_out;
+    int found_card = -1;
+
+    memset(&drm_out, 0, sizeof(drm_out));
+    drm_out.fd = -1;
+
+    for (int c = 0; c < 8; c++) {
+        char path[32];
+        int fd;
+
+        (void)snprintf(path, sizeof(path), "/dev/dri/card%d", c);
+        fd = open(path, O_RDWR);
+        if (fd < 0) {
+            continue;
+        }
+        if (drm_find_output(fd, &drm_out) == 0) {
+            drm_out.fd = fd;
+            found_card = c;
+            break;
+        }
+        (void)close(fd);
+    }
+
+    if (found_card >= 0 && drm_setup_dumb_fb(&drm_out) == 0) {
+        cb_renderer_t renderer;
+        printf("DRM output initialized on card%d: %ux%u connector=%u crtc=%u\n", found_card, drm_out.width,
+               drm_out.height, drm_out.connector_id, drm_out.crtc_id);
+
+        if (cb_renderer_init(&renderer, drm_out.width, drm_out.height, node_name) == CB_RENDER_OK) {
+            (void)cb_renderer_load_from_store(&renderer, snapshots_dir, 0ULL);
+            (void)cb_renderer_render_frame(&renderer, 0ULL);
+            drm_present_surface(&drm_out, &renderer.frame);
+            if (daemon_mode) {
+                while (1) {
+                    (void)sleep(1);
+                }
+            }
+            cb_renderer_free(&renderer);
+        }
+        drm_close_output(&drm_out);
+    } else if (daemon_mode) {
+        /* Headless / disconnected fallback */
+        while (1) {
+            (void)sleep(1);
+        }
+    }
+    return 0;
+}
+#endif
+
 int main(int argc, char **argv)
 {
     const char *snapshots_dir = "/data/snapshots";
@@ -375,57 +438,12 @@ int main(int argc, char **argv)
 
 #ifdef __linux__
     if (try_drm) {
-        cb_drm_output_t drm_out;
-        int found_card = -1;
-
-        memset(&drm_out, 0, sizeof(drm_out));
-        drm_out.fd = -1;
-
-        for (int c = 0; c < 8; c++) {
-            char path[32];
-            int fd;
-
-            (void)snprintf(path, sizeof(path), "/dev/dri/card%d", c);
-            fd = open(path, O_RDWR);
-            if (fd < 0) {
-                continue;
-            }
-            if (drm_find_output(fd, &drm_out) == 0) {
-                drm_out.fd = fd;
-                found_card = c;
-                break;
-            }
-            (void)close(fd);
-        }
-
-        if (found_card >= 0 && drm_setup_dumb_fb(&drm_out) == 0) {
-            cb_renderer_t renderer;
-            printf("DRM output initialized on card%d: %ux%u connector=%u crtc=%u\n", found_card, drm_out.width,
-                   drm_out.height, drm_out.connector_id, drm_out.crtc_id);
-
-            if (cb_renderer_init(&renderer, drm_out.width, drm_out.height, node_name) == CB_RENDER_OK) {
-                (void)cb_renderer_load_from_store(&renderer, snapshots_dir, 0ULL);
-                (void)cb_renderer_render_frame(&renderer, 0ULL);
-                drm_present_surface(&drm_out, &renderer.frame);
-                if (daemon_mode) {
-                    while (1) {
-                        (void)sleep(1);
-                    }
-                }
-                cb_renderer_free(&renderer);
-            }
-            drm_close_output(&drm_out);
-        } else {
-            /* Headless / disconnected fallback */
-            if (daemon_mode) {
-                while (1) {
-                    (void)sleep(1);
-                }
-            }
-        }
+        return run_drm(snapshots_dir, node_name, daemon_mode);
     }
 #else
     (void)try_drm;
+    (void)snapshots_dir;
+    (void)node_name;
     if (daemon_mode) {
         while (1) {
             (void)sleep(1);
