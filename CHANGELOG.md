@@ -146,5 +146,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (bootloader, firmware, kernel, and userspace), unattended N-cycle statistical
   analysis (`p50`, `p95`, min, max, stddev), machine-readable JSON and CSV
   reporting, and full offline/unit test suite for deterministic CI execution.
+- Physical hardware verification of HDMI-CEC display control across physical TV
+  hardware (`CEC-001`–`CEC-006`, `TEST-007`). Added `CONFIG_I2C=y` and
+  `CONFIG_I2C_BCM2835=y` to `os/board/chalkboard/linux.fragment` for built-in DDC
+  EDID negotiation, configured `dtoverlay=vc4-kms-v3d,noaudio` and dedicated
+  `[pi3]` firmware profiles in `config.txt`, implemented native ioctl execution
+  (`CEC_TRANSMIT`, `CEC_RECEIVE`, `CEC_ADAP_G_PHYS_ADDR`) in `chalkboard-agent`
+  `LinuxCecAdapter`, implemented HIL test tool (`tools/hil/cec-test.c`), verified
+  OSD announcement (`Chalkboard`), power toggling (`Image View On`, `Standby`),
+  input switching (`Active Source`), and power status polling against physical LG
+  TV (`LG TV SSCR2`), and published the initial CEC compatibility matrix
+  (`docs/cec-matrix.md`).
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
