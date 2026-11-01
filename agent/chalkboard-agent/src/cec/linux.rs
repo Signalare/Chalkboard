@@ -132,9 +132,11 @@ impl CecAdapter for LinuxCecAdapter {
                 ));
             }
 
-            let mut raw_msg = RawCecMsg::default();
-            raw_msg.len = raw.len() as u32;
-            raw_msg.timeout = 1000;
+            let mut raw_msg = RawCecMsg {
+                len: raw.len() as u32,
+                timeout: 1000,
+                ..Default::default()
+            };
             raw_msg.msg[..raw.len()].copy_from_slice(&raw);
 
             let ret = unsafe { libc::ioctl(file.as_raw_fd(), CEC_TRANSMIT, &mut raw_msg) };
@@ -177,8 +179,10 @@ impl CecAdapter for LinuxCecAdapter {
                 .open(&self.device_path)
                 .map_err(|e| CecError::PermissionDenied(e.to_string()))?;
 
-            let mut raw_msg = RawCecMsg::default();
-            raw_msg.timeout = 500;
+            let mut raw_msg = RawCecMsg {
+                timeout: 500,
+                ..Default::default()
+            };
             let ret = unsafe { libc::ioctl(file.as_raw_fd(), CEC_RECEIVE, &mut raw_msg) };
             if ret == 0 && raw_msg.len > 0 {
                 let slice = &raw_msg.msg[..raw_msg.len as usize];
@@ -212,10 +216,12 @@ impl CecAdapter for LinuxCecAdapter {
             let query = CecMessage::give_device_power_status(self.logical_address, LOG_ADDR_TV);
             let raw = query.to_raw_bytes();
 
-            let mut raw_msg = RawCecMsg::default();
-            raw_msg.len = raw.len() as u32;
-            raw_msg.timeout = 1000;
-            raw_msg.reply = 0x90; // CEC_MSG_REPORT_POWER_STATUS
+            let mut raw_msg = RawCecMsg {
+                len: raw.len() as u32,
+                timeout: 1000,
+                reply: 0x90, // CEC_MSG_REPORT_POWER_STATUS
+                ..Default::default()
+            };
             raw_msg.msg[..raw.len()].copy_from_slice(&raw);
 
             let ret = unsafe { libc::ioctl(file.as_raw_fd(), CEC_TRANSMIT, &mut raw_msg) };
