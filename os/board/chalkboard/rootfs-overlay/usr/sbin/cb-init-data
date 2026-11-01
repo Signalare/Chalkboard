@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# First-boot expansion, integrity check and mounting of /data (STO-008, STO-009, STO-011).
+#
+# Invoked during sysinit from /etc/inittab before the renderer or agent starts.
+
+set -euo pipefail
+
+DATA_MOUNT="/data"
+DATA_OPTS="noatime,fsync_mode=posix,background_gc=on,discard"
+MAX_SECTORS_32GB=67108864 # 32 GB in 512-byte sectors
+
+mkdir -p "$DATA_MOUNT"
+
+# 1. Locate the data partition
+find_data_dev() {
+  # First check filesystem label
+  local dev
+  dev="$(blkid -L DATA 2>/dev/null || true)"
+  if [[ -n "$dev" && -b "$dev" ]]; then
+    echo "$dev"
+    return 0
+  fi
+
+  # Fallback to standard Chalkboard partition 7 on boot device
+  for candidate in /dev/mmcblk0p7 /dev/nvme0n1p7 /dev/sda7 /dev/vda7; do
+    if [[ -b "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+if ! DATA_DEV="$(find_data_dev)"; then
+  echo "cb-init-data: No DATA partition found. Continuing without persistent /data."
+  exit 0
+fi
+
+echo "cb-init-data: Found data partition at $DATA_DEV"
+
+# 2. First-boot partition growth (STO-009)
+grow_data_partition() {
+  local dev="$1"
+  local part_name="${dev#/dev/}"
+  
+  # Determine parent block device
+  local parent_sys="/sys/class/block/${part_name}"
+  if [[ ! -d "$parent_sys" ]]; then
+    return 0
+  fi
+
+  # In sysfs, partition has a parent directory or points to parent disk
+  local disk_name
+  if [[ -f "${parent_sys}/partition" ]]; then
+    disk_name="$(basename "$(dirname "$(readlink -f "${parent_sys}")")")"
+  else
+    return 0
+  fi
+
+  local disk_sys="/sys/class/block/${disk_name}"
+  if [[ ! -f "${disk_sys}/size" || ! -f "${parent_sys}/start" || ! -f "${parent_sys}/size" ]]; then
+    return 0
+  fi
+
+  local total_disk_sectors part_start part_sectors
+  total_disk_sectors="$(cat "${disk_sys}/size")"
+  part_start="$(cat "${parent_sys}/start")"
+  part_sectors="$(cat "${parent_sys}/size")"
+
+  # Leave 10% spare area unpartitioned for flash wear levelling (STO-009)
+  local max_end_sector=$(( total_disk_sectors * 90 / 100 ))
+  if (( max_end_sector <= part_start )); then
+    return 0
+  fi
+
+  local available_sectors=$(( max_end_sector - part_start ))
+  local target_sectors=$(( available_sectors < MAX_SECTORS_32GB ? available_sectors : MAX_SECTORS_32GB ))
+
+  # Compare target vs current (allow 1 MB tolerance for alignment)
+  local diff=$(( target_sectors - part_sectors ))
+  if (( diff > 2048 )); then
+    echo "cb-init-data: Growing partition $dev from $part_sectors to $target_sectors sectors (disk: $total_disk_sectors)..."
+
+    # Use parted or sfdisk if available to resize the partition
+    local part_num
+    part_num="$(cat "${parent_sys}/partition")"
+    local disk_dev="/dev/${disk_name}"
+
+    if command -v parted >/dev/null 2>&1; then
+      local end_sector=$(( part_start + target_sectors - 1 ))
+      parted -s "$disk_dev" unit s resizepart "$part_num" "$end_sector" || true
+    fi
+
+    # Reread partition table
+    blockdev --rereadpt "$disk_dev" 2>/dev/null || true
+  fi
+
+  # Run offline resize.f2fs (idempotent; safe no-op if already matching)
+  if command -v resize.f2fs >/dev/null 2>&1; then
+    echo "cb-init-data: Running resize.f2fs on $dev..."
+    resize.f2fs "$dev" || true
+  fi
+}
+
+grow_data_partition "$DATA_DEV"
+
+# 3. Mount and check integrity (STO-008, STO-011)
+mount_data() {
+  local dev="$1"
+
+  # Fast immediate mount (BOOT-001, STO-011)
+  if mount -t f2fs -o "$DATA_OPTS" "$dev" "$DATA_MOUNT" 2>/dev/null; then
+    echo "cb-init-data: /data mounted successfully with options: $DATA_OPTS"
+    return 0
+  fi
+
+  echo "cb-init-data: Mount failed. Running fsck.f2fs on $dev (STO-011)..."
+  if command -v fsck.f2fs >/dev/null 2>&1; then
+    if fsck.f2fs -a "$dev"; then
+      echo "cb-init-data: fsck.f2fs repaired volume. Retrying mount..."
+      if mount -t f2fs -o "$DATA_OPTS" "$dev" "$DATA_MOUNT"; then
+        return 0
+      fi
+    fi
+  fi
+
+  echo "cb-init-data: Filesystem unrepairable. Reformatting as fresh F2FS (STO-011)..."
+  if command -v mkfs.f2fs >/dev/null 2>&1; then
+    mkfs.f2fs -l DATA -f "$dev"
+    mount -t f2fs -o "$DATA_OPTS" "$dev" "$DATA_MOUNT"
+    return 0
+  fi
+
+  return 1
+}
+
+mount_data "$DATA_DEV"
+
+# 4. Ensure persistent directories exist (STO-010)
+mkdir -p "$DATA_MOUNT/store" \
+         "$DATA_MOUNT/blobs" \
+         "$DATA_MOUNT/snapshots" \
+         "$DATA_MOUNT/crashes"
+
+chmod 0755 "$DATA_MOUNT"
+echo "cb-init-data: Initialization complete."

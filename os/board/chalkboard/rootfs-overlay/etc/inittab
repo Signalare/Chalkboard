@@ -14,9 +14,8 @@
 ::sysinit:/bin/mount -t tmpfs -o nosuid,nodev,size=8m tmpfs /run
 ::sysinit:/bin/mount -t tmpfs -o nosuid,nodev,size=16m tmpfs /var/log
 
-# Mount persistent /data if available (STO-008)
-::sysinit:/bin/mkdir -p /data
-::sysinit:/bin/mount -t f2fs -o noatime,background_gc=on,discard /dev/mmcblk0p7 /data || true
+# Initialize and mount persistent /data (STO-008, STO-009, STO-011)
+::sysinit:/usr/sbin/cb-init-data
 
 # Renderer starts BEFORE agent and any network service (BOOT-003)
 ::sysinit:/usr/bin/chalkboard-render --drm --daemon || true
