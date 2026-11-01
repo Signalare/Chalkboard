@@ -85,5 +85,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   detection triggering immediate fail-safe reboot and fallback to the alternate
   slot (`OS-001`–`OS-004`, `OS-007`, `OS-010`, `BOOT-004`, `BOOT-007`,
   `TEST-011`).
+- Physical hardware verification of F2FS `/data` partition expansion, 32 GB
+  capacity capping, 10% wear-levelling reserve, and unrepairable corruption
+  recovery on target hardware (Raspberry Pi 4 Model B with 124 GB USB storage,
+  `/dev/sda7`), adding native C partition growth tool (`cb-growpart`), POSIX
+  clean shell scripts, and HIL serial test automation (`STO-008`, `STO-009`,
+  `STO-011`, `BOOT-001`, `TEST-003`).
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main

@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # SPDX-License-Identifier: MIT OR Apache-2.0
 #
 # Harvests pstore/ramoops panic and crash dumps to /data/crashes/ (OS-008, STO-010).
 # Strictly maintains at most 20 reports, pruning oldest when exceeded.
 
-set -euo pipefail
+set -eu
 
 PSTORE_DIR="/sys/fs/pstore"
 CRASH_DIR="/data/crashes"
@@ -17,27 +17,30 @@ if ! mountpoint -q /data 2>/dev/null; then
 fi
 
 # 2. Ensure pstore filesystem is mounted
-if [[ -d "$PSTORE_DIR" ]] && ! mountpoint -q "$PSTORE_DIR" 2>/dev/null; then
+if [ -d "$PSTORE_DIR" ] && ! mountpoint -q "$PSTORE_DIR" 2>/dev/null; then
   mount -t pstore pstore "$PSTORE_DIR" 2>/dev/null || true
 fi
 
-if [[ ! -d "$PSTORE_DIR" ]]; then
+if [ ! -d "$PSTORE_DIR" ]; then
   exit 0
 fi
 
 mkdir -p "$CRASH_DIR"
 
 # 3. Check for crash files in pstore
-shopt -s nullglob
-pstore_files=("$PSTORE_DIR"/dmesg-* "$PSTORE_DIR"/console-* "$PSTORE_DIR"/pmsg-*)
-shopt -u nullglob
+found_files=""
+for f in "$PSTORE_DIR"/dmesg-* "$PSTORE_DIR"/console-* "$PSTORE_DIR"/pmsg-*; do
+  if [ -f "$f" ]; then
+    found_files="$found_files $f"
+  fi
+done
 
-if (( ${#pstore_files[@]} == 0 )); then
+if [ -z "$found_files" ]; then
   # No crash files to collect
   exit 0
 fi
 
-echo "cb-crash-collect: Found ${#pstore_files[@]} crash artifacts in pstore."
+echo "cb-crash-collect: Found crash artifacts in pstore."
 
 timestamp="$(date -u +"%Y%m%d_%H%M%S" 2>/dev/null || date +"%s")"
 report_file="${CRASH_DIR}/crash_${timestamp}.txt"
@@ -48,8 +51,8 @@ report_file="${CRASH_DIR}/crash_${timestamp}.txt"
   echo "Captured from pstore/ramoops (OS-008)"
   echo "================================================================================"
   echo ""
-  for f in "${pstore_files[@]}"; do
-    if [[ -f "$f" ]]; then
+  for f in $found_files; do
+    if [ -f "$f" ]; then
       echo "--- File: $(basename "$f") ---"
       cat "$f"
       echo ""
@@ -66,21 +69,17 @@ prune_old_reports() {
   local dir="$1"
   local max="$2"
 
-  shopt -s nullglob
-  local reports=("$dir"/crash_*.txt)
-  shopt -u nullglob
-
-  local total=${#reports[@]}
-  if (( total > max )); then
-    local excess=$(( total - max ))
+  total=$(ls -1 "$dir"/crash_*.txt 2>/dev/null | wc -l)
+  if [ "$total" -gt "$max" ]; then
+    excess=$(( total - max ))
     echo "cb-crash-collect: Pruning $excess old crash report(s) to enforce limit of $max."
 
-    # Sort oldest first by mtime and remove excess
-    while IFS= read -r old_file; do
-      if [[ -n "$old_file" && -f "$old_file" ]]; then
+    # Sort oldest first by mtime (ls -tr) and remove excess
+    ls -1tr "$dir"/crash_*.txt 2>/dev/null | head -n "$excess" | while IFS= read -r old_file; do
+      if [ -n "$old_file" ] && [ -f "$old_file" ]; then
         rm -f "$old_file"
       fi
-    done < <(find "$dir" -maxdepth 1 -name "crash_*.txt" -type f -printf "%T@ %p\n" 2>/dev/null | sort -n | head -n "$excess" | cut -d' ' -f2-)
+    done
   fi
 }
 
