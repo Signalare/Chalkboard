@@ -69,13 +69,18 @@ static int try_connector(int fd, uint32_t conn_id, const uint32_t *crtc_ids, uin
     struct drm_mode_get_connector conn = {.connector_id = conn_id};
     struct drm_mode_modeinfo *modes = NULL;
     uint32_t *encoders = NULL;
+    uint32_t count_modes;
+    uint32_t count_encoders;
     int ret = -1;
 
-    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) != 0 || conn.connection != 1 || conn.count_modes == 0) {
+    if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) != 0 || conn.connection != 1 || conn.count_modes == 0 ||
+        conn.count_encoders == 0) {
         return -1;
     }
-    modes = (struct drm_mode_modeinfo *)calloc(conn.count_modes, sizeof(*modes));
-    encoders = (uint32_t *)calloc(conn.count_encoders ? conn.count_encoders : 1U, sizeof(*encoders));
+    count_modes = (uint32_t)conn.count_modes;
+    count_encoders = (uint32_t)conn.count_encoders;
+    modes = (struct drm_mode_modeinfo *)calloc(count_modes, sizeof(*modes));
+    encoders = (uint32_t *)calloc(count_encoders, sizeof(*encoders));
     if (modes == NULL || encoders == NULL) {
         free(modes);
         free(encoders);
@@ -85,13 +90,13 @@ static int try_connector(int fd, uint32_t conn_id, const uint32_t *crtc_ids, uin
     conn.encoders_ptr = (uint64_t)(uintptr_t)encoders;
     if (drm_xioctl(fd, DRM_IOCTL_MODE_GETCONNECTOR, &conn) == 0) {
         drm->mode = modes[0];
-        for (uint32_t m = 0; m < conn.count_modes; m++) {
+        for (uint32_t m = 0; m < count_modes; m++) {
             if (modes[m].type & DRM_MODE_TYPE_PREFERRED) {
                 drm->mode = modes[m];
                 break;
             }
         }
-        for (uint32_t e = 0; e < conn.count_encoders; e++) {
+        for (uint32_t e = 0; e < count_encoders; e++) {
             if (find_crtc_for_encoder(fd, encoders[e], crtc_ids, count_crtcs, &drm->crtc_id) == 0) {
                 drm->connector_id = conn.connector_id;
                 ret = 0;
@@ -109,13 +114,17 @@ static int drm_find_output(int fd, cb_drm_output_t *drm)
     struct drm_mode_card_res res = {0};
     uint32_t *conn_ids = NULL;
     uint32_t *crtc_ids = NULL;
+    uint32_t count_connectors;
+    uint32_t count_crtcs;
     int found = -1;
 
     if (drm_xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res) != 0 || res.count_connectors == 0 || res.count_crtcs == 0) {
         return -1;
     }
-    conn_ids = (uint32_t *)calloc(res.count_connectors, sizeof(*conn_ids));
-    crtc_ids = (uint32_t *)calloc(res.count_crtcs, sizeof(*crtc_ids));
+    count_connectors = (uint32_t)res.count_connectors;
+    count_crtcs = (uint32_t)res.count_crtcs;
+    conn_ids = (uint32_t *)calloc(count_connectors, sizeof(*conn_ids));
+    crtc_ids = (uint32_t *)calloc(count_crtcs, sizeof(*crtc_ids));
     if (conn_ids == NULL || crtc_ids == NULL) {
         free(conn_ids);
         free(crtc_ids);
@@ -124,8 +133,8 @@ static int drm_find_output(int fd, cb_drm_output_t *drm)
     res.connector_id_ptr = (uint64_t)(uintptr_t)conn_ids;
     res.crtc_id_ptr = (uint64_t)(uintptr_t)crtc_ids;
     if (drm_xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res) == 0) {
-        for (uint32_t i = 0; i < res.count_connectors; i++) {
-            if (try_connector(fd, conn_ids[i], crtc_ids, res.count_crtcs, drm) == 0) {
+        for (uint32_t i = 0; i < count_connectors; i++) {
+            if (try_connector(fd, conn_ids[i], crtc_ids, count_crtcs, drm) == 0) {
                 found = 0;
                 break;
             }
