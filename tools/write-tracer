@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Wrapper for write_tracer.py (TEST-009).
+exec "$(dirname "$0")/write_tracer.py" "$@"

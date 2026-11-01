@@ -70,6 +70,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and OOM priority protection (`cb-start-render` protecting renderer with
   `oom_score_adj -900` while agent is sacrificed first) (`OS-008`, `OS-009`,
   `STO-010`).
+- Write tracer tool (`tools/write-tracer`, `tools/write_tracer.py`) attributing
+  boot-device writes to process and path, enforcing the STO-010 persistent
+  storage allowlist, reporting rogue writers with process name and target path,
+  and testing daily write budgets against idle (≤ 1 MB/day) and typical use
+  (50 toggles, 1 publication ≤ 50 MB/day) (`TEST-009`, `STO-010`, `STO-013`).
   (`/api/v1/cec/power`, `/api/v1/cec/status`), and web UI control panel.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main
