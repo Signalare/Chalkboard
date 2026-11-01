@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Kernel configuration fragment for Chalkboard universal OS image.
+
+# Built-in DRM/KMS display driver: no module loading on critical path (BOOT-004).
+CONFIG_DRM=y
+CONFIG_DRM_VC4=y
+CONFIG_DRM_V3D=y
+CONFIG_SND=y
+CONFIG_SND_SOC=y
+
+# Built-in Device Mapper and dm-verity with cmdline table initialization (OS-010).
+CONFIG_MD=y
+CONFIG_BLK_DEV_DM=y
+CONFIG_DM_INIT=y
+CONFIG_DM_VERITY=y
+CONFIG_DM_VERITY_VERIFY_ROOTHASH_SIG=n
+
+# Built-in Filesystems (OS-003, OS-004, STO-008).
+CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS_XZ=y
+CONFIG_SQUASHFS_4K=y
+CONFIG_F2FS_FS=y
+CONFIG_F2FS_FS_SECURITY=y
+
+# Hardware Watchdog enabled for automatic reboot on hang (OS-007).
+CONFIG_WATCHDOG=y
+CONFIG_BCM2835_WDT=y
+
+# HDMI-CEC support (CEC-001).
+CONFIG_CEC_CORE=y
+CONFIG_MEDIA_CEC_SUPPORT=y
+CONFIG_DRM_VC4_HDMI_CEC=y
+
+# Crash capture and debug buffers (OS-008).
+CONFIG_PSTORE=y
+CONFIG_PSTORE_CONSOLE=y
+CONFIG_PSTORE_PMSG=y
+CONFIG_PSTORE_RAM=y
+
+# Compressed RAM swap (OS-009).
+CONFIG_ZRAM=y
+CONFIG_CRYPTO_LZ4=y

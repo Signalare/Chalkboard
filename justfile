@@ -81,9 +81,9 @@ os-buildenv:
     docker build -q -t chalkboard-buildenv tools/buildenv
 
 # Build an OS image from os/configs/<defconfig>; images land in build/os/.
-# Pass a Buildroot target to run it first, e.g. `just os-build spike_rpi4_defconfig cb-spike-tools-rebuild`
+# Pass a Buildroot target to run it first, e.g. `just os-build chalkboard_defconfig`
 # (Buildroot does not notice source changes in local packages).
-os-build defconfig="spike_rpi4_defconfig" target="": os-buildenv
+os-build defconfig="chalkboard_defconfig" target="": os-buildenv
     mkdir -p build/os
     {{ if target != "" { os_docker + " /src/tools/buildenv/build.sh " + defconfig + " " + target } else { "true" } }}
     {{os_docker}} /src/tools/buildenv/build.sh {{defconfig}}

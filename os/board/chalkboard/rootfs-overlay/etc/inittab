@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# BusyBox inittab for Chalkboard (OS-006, BOOT-003, OS-004, OS-009).
+
+# Core kernel filesystems
+::sysinit:/bin/mount -t proc proc /proc
+::sysinit:/bin/mount -t sysfs sysfs /sys
+::sysinit:/bin/mount -t devtmpfs devtmpfs /dev
+::sysinit:/bin/mkdir -p /dev/pts /dev/shm
+::sysinit:/bin/mount -t devpts devpts /dev/pts
+
+# Size-capped RAM tmpfs mounts (OS-004, OS-009)
+::sysinit:/bin/mount -t tmpfs -o nosuid,nodev,size=64m tmpfs /tmp
+::sysinit:/bin/mount -t tmpfs -o nosuid,nodev,size=8m tmpfs /run
+::sysinit:/bin/mount -t tmpfs -o nosuid,nodev,size=16m tmpfs /var/log
+
+# Mount persistent /data if available (STO-008)
+::sysinit:/bin/mkdir -p /data
+::sysinit:/bin/mount -t f2fs -o noatime,background_gc=on,discard /dev/mmcblk0p7 /data || true
+
+# Renderer starts BEFORE agent and any network service (BOOT-003)
+::sysinit:/usr/bin/chalkboard-render --drm --daemon || true
+
+# Supervisor restarts crashed agent within 1 s (OS-006)
+::respawn:/usr/bin/chalkboard-agent --supervisor
+
+# Serial console for diagnostic access
+ttyAMA0::respawn:/sbin/getty -L -n -l /bin/sh ttyAMA0 115200 vt100
+
+# Clean shutdown
+::shutdown:/bin/sync
+::shutdown:/bin/umount -a -r
