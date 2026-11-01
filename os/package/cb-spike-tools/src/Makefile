@@ -2,7 +2,7 @@
 CFLAGS ?= -O2
 CFLAGS += -std=c11 -Wall -Wextra -Werror
 
-all: cb-firstframe cb-tryboot-reboot cb-rawpatch
+all: cb-firstframe cb-tryboot-reboot cb-rawpatch cb-growpart
 
 cb-firstframe: firstframe.c
 	$(CC) $(CFLAGS) -o $@ $<
@@ -13,7 +13,10 @@ cb-tryboot-reboot: tryboot-reboot.c
 cb-rawpatch: rawpatch.c
 	$(CC) $(CFLAGS) -o $@ $<
 
+cb-growpart: cb-growpart.c
+	$(CC) $(CFLAGS) -o $@ $<
+
 clean:
-	rm -f cb-firstframe cb-tryboot-reboot cb-rawpatch
+	rm -f cb-firstframe cb-tryboot-reboot cb-rawpatch cb-growpart
 
 .PHONY: all clean

@@ -18,6 +18,7 @@ define CB_SPIKE_TOOLS_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/cb-firstframe $(TARGET_DIR)/usr/sbin/cb-firstframe
 	$(INSTALL) -D -m 0755 $(@D)/cb-tryboot-reboot $(TARGET_DIR)/usr/sbin/cb-tryboot-reboot
 	$(INSTALL) -D -m 0755 $(@D)/cb-rawpatch $(TARGET_DIR)/usr/sbin/cb-rawpatch
+	$(INSTALL) -D -m 0755 $(@D)/cb-growpart $(TARGET_DIR)/usr/sbin/cb-growpart
 	$(INSTALL) -D -m 0755 $(@D)/cb-firstframe-start $(TARGET_DIR)/usr/sbin/cb-firstframe-start
 	$(INSTALL) -D -m 0755 $(@D)/cb-slot $(TARGET_DIR)/usr/sbin/cb-slot
 	$(INSTALL) -D -m 0755 $(@D)/cb-tryboot $(TARGET_DIR)/usr/sbin/cb-tryboot
