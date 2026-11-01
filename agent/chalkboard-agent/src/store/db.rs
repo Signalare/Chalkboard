@@ -336,6 +336,12 @@ impl Store {
         Ok(list)
     }
 
+    pub fn delete_category(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM categories WHERE id = ?1;", params![id])?;
+        Ok(())
+    }
+
     pub fn insert_item(&self, item: &Item) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -395,6 +401,64 @@ impl Store {
         Ok(list)
     }
 
+    pub fn get_items(&self) -> Result<Vec<Item>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, category_id, name, description, price_primary, price_secondary, badge, image_hash, sold_out, sort_order
+             FROM items ORDER BY sort_order ASC, id ASC;",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            let sold_int: i32 = r.get(8)?;
+            Ok(Item {
+                id: r.get(0)?,
+                category_id: r.get(1)?,
+                name: r.get(2)?,
+                description: r.get(3)?,
+                price_primary: r.get(4)?,
+                price_secondary: r.get(5)?,
+                badge: r.get(6)?,
+                image_hash: r.get(7)?,
+                sold_out: sold_int != 0,
+                sort_order: r.get(9)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for item in rows {
+            list.push(item?);
+        }
+        Ok(list)
+    }
+
+    pub fn get_item(&self, id: &str) -> Result<Option<Item>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, category_id, name, description, price_primary, price_secondary, badge, image_hash, sold_out, sort_order
+             FROM items WHERE id = ?1;",
+        )?;
+        stmt.query_row([id], |r| {
+            let sold_int: i32 = r.get(8)?;
+            Ok(Item {
+                id: r.get(0)?,
+                category_id: r.get(1)?,
+                name: r.get(2)?,
+                description: r.get(3)?,
+                price_primary: r.get(4)?,
+                price_secondary: r.get(5)?,
+                badge: r.get(6)?,
+                image_hash: r.get(7)?,
+                sold_out: sold_int != 0,
+                sort_order: r.get(9)?,
+            })
+        })
+        .optional()
+    }
+
+    pub fn delete_item(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM items WHERE id = ?1;", params![id])?;
+        Ok(())
+    }
+
     pub fn set_item_sold_out(&self, item_id: &str, sold_out: bool) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -446,6 +510,26 @@ impl Store {
             })
         })
         .optional()
+    }
+
+    pub fn get_templates(&self) -> Result<Vec<Template>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, schema_version, document_json FROM templates ORDER BY id ASC;",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(Template {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                schema_version: r.get(2)?,
+                document_json: r.get(3)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for tpl in rows {
+            list.push(tpl?);
+        }
+        Ok(list)
     }
 
     pub fn insert_page(&self, p: &Page) -> Result<()> {
@@ -505,6 +589,40 @@ impl Store {
         .optional()
     }
 
+    pub fn get_pages(&self) -> Result<Vec<Page>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, template_id, title, duration_ms, transition, transition_ms, repeater_capacity, schedule_start_min, schedule_end_min, category_id, sort_order
+             FROM pages ORDER BY sort_order ASC, id ASC;",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(Page {
+                id: r.get(0)?,
+                template_id: r.get(1)?,
+                title: r.get(2)?,
+                duration_ms: r.get(3)?,
+                transition: r.get(4)?,
+                transition_ms: r.get(5)?,
+                repeater_capacity: r.get(6)?,
+                schedule_start_min: r.get(7)?,
+                schedule_end_min: r.get(8)?,
+                category_id: r.get(9)?,
+                sort_order: r.get(10)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for p in rows {
+            list.push(p?);
+        }
+        Ok(list)
+    }
+
+    pub fn delete_page(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM pages WHERE id = ?1;", params![id])?;
+        Ok(())
+    }
+
     pub fn insert_screen(&self, s: &Screen) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let playlist_json = serde_json::to_string(&s.playlist).unwrap_or_else(|_| "[]".to_string());
@@ -560,6 +678,35 @@ impl Store {
             })
         })
         .optional()
+    }
+
+    pub fn get_screens(&self) -> Result<Vec<Screen>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, node_id, rotation, logical_width, logical_height, sold_out_mode, sold_out_badge, sold_out_dim_alpha, playlist_json
+             FROM screens ORDER BY id ASC;",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            let playlist_str: String = r.get(9)?;
+            let playlist = serde_json::from_str(&playlist_str).unwrap_or_default();
+            Ok(Screen {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                node_id: r.get(2)?,
+                rotation: r.get(3)?,
+                logical_width: r.get(4)?,
+                logical_height: r.get(5)?,
+                sold_out_mode: r.get(6)?,
+                sold_out_badge: r.get(7)?,
+                sold_out_dim_alpha: r.get(8)?,
+                playlist,
+            })
+        })?;
+        let mut list = Vec::new();
+        for s in rows {
+            list.push(s?);
+        }
+        Ok(list)
     }
 
     /// Sets announcement text and visibility in live_state table (RND-008, PUB-004).

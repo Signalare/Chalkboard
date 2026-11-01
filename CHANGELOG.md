@@ -35,5 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   support, Unix domain socket renderer IPC protocol (`load_snapshot`,
   `apply_live_state`, `identify`, `screenshot`, `status`), and process
   supervision restarting crashed child services within 1 s.
+- Single-node web application (`web/`) built with Svelte 5 and TypeScript
+  under a lightweight uncompressed bundle budget (≤ 300 kB), providing
+  a fast sold-out toggle start page with accessible switch controls, a
+  complete menu editor for categories and items, a template library browser
+  covering `classic-list`, `two-column`, `grid-images`, and `highlight`,
+  screen configuration (rotation: 0/90/180/270, dimensions, sold-out display
+  mode) and playlist sequence manager, and an embedded agent HTTP/1.1 API
+  (`/api/v1`) with instant snapshot publish capability.
 
 [Unreleased]: https://github.com/Signalare/Chalkboard/commits/main

@@ -343,3 +343,107 @@ fn os_006_supervisor_restarts_crashed_child_under_1s() {
     );
     supervisor.stop();
 }
+
+#[test]
+fn web_001_web_007_http_api_endpoints() {
+    let tmp = make_temp_dir("http-api");
+    let db_path = tmp.join("chalkboard.db");
+    let snapshots_root = tmp.join("snapshots");
+    let web_dist = tmp.join("dist");
+    fs::create_dir_all(&web_dist).unwrap();
+    fs::write(
+        web_dist.join("index.html"),
+        "<html><body>Chalkboard</body></html>",
+    )
+    .unwrap();
+
+    let store = Store::open(&db_path, None).unwrap();
+
+    // Helper closure to process HTTP requests directly via handle_connection (WEB-001, WEB-007)
+    let send_req = |method: &str, path: &str, body: &str| -> (u16, String) {
+        let req = format!(
+            "{method} {path} HTTP/1.1\r\n\
+             Host: localhost\r\n\
+             Content-Type: application/json\r\n\
+             Content-Length: {}\r\n\
+             Connection: close\r\n\
+             \r\n\
+             {body}",
+            body.len()
+        );
+        let mut writer = Vec::new();
+        chalkboard_agent::http::HttpServer::handle_connection(
+            req.as_bytes(),
+            &mut writer,
+            store.clone(),
+            &snapshots_root,
+            &web_dist,
+            None,
+        )
+        .unwrap();
+
+        let resp = String::from_utf8(writer).unwrap();
+        let status_code: u16 = resp
+            .lines()
+            .next()
+            .and_then(|l| l.split_whitespace().nth(1))
+            .and_then(|c| c.parse().ok())
+            .unwrap_or(0);
+        let body = resp.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+        (status_code, body)
+    };
+
+    // 1. GET /api/v1/status
+    let (code, body) = send_req("GET", "/api/v1/status", "");
+    assert_eq!(code, 200);
+    assert!(body.contains("\"status\":\"ok\""));
+
+    // 2. POST /api/v1/categories
+    let cat_json = r#"{"id":"cat-specials","title":"Today Specials","description":"Chef picks","sort_order":1,"image":null}"#;
+    let (code, body) = send_req("POST", "/api/v1/categories", cat_json);
+    assert_eq!(code, 200);
+    assert!(body.contains("Today Specials"));
+
+    // 3. GET /api/v1/categories
+    let (code, body) = send_req("GET", "/api/v1/categories", "");
+    assert_eq!(code, 200);
+    assert!(body.contains("cat-specials"));
+
+    // 4. POST /api/v1/items
+    let item_json = r#"{"id":"item-soup","category_id":"cat-specials","name":"Tuscan Tomato Soup","description":"With garlic croutons","price_primary":"75 kr","price_secondary":"","badge":"NEW","image_hash":"","sold_out":false,"sort_order":1}"#;
+    let (code, body) = send_req("POST", "/api/v1/items", item_json);
+    assert_eq!(code, 200);
+    assert!(body.contains("Tuscan Tomato Soup"));
+
+    // 5. POST /api/v1/items/item-soup/sold-out (WEB-005)
+    let (code, body) = send_req(
+        "POST",
+        "/api/v1/items/item-soup/sold-out",
+        r#"{"sold_out":true}"#,
+    );
+    assert_eq!(code, 200);
+    assert!(body.contains("\"status\":\"ok\""));
+
+    // 6. GET /api/v1/templates
+    let (code, body) = send_req("GET", "/api/v1/templates", "");
+    assert_eq!(code, 200);
+    assert!(body.contains("list-classic"));
+
+    // 7. POST /api/v1/screens
+    let screen_json = r#"{"id":"screen-main","name":"Front Screen","node_id":"node-01","rotation":0,"logical_width":1920,"logical_height":1080,"sold_out_mode":"badge","sold_out_badge":"SOLD OUT","sold_out_dim_alpha":102,"playlist":[]}"#;
+    let (code, _) = send_req("POST", "/api/v1/screens", screen_json);
+    assert_eq!(code, 200);
+
+    // 8. POST /api/v1/publish
+    let (code, body) = send_req("POST", "/api/v1/publish", "");
+    assert_eq!(code, 200);
+    assert!(body.contains("\"status\":\"ok\""));
+    assert!(body.contains("\"hash\":"));
+
+    // 9. Static file fallback
+    let (code, body) = send_req("GET", "/", "");
+    assert_eq!(code, 200);
+    assert!(body.contains("Chalkboard"));
+
+    let _ = fs::remove_dir_all(&tmp);
+}
