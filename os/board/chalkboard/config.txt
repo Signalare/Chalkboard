@@ -4,6 +4,10 @@
 # Applies to all supported boards (Pi 3B+, 4B, 5, Zero 2 W).
 
 [all]
+start_file=start4.elf
+fixup_file=fixup4.dat
+# Kernel names per SoC family (OS-002: kernel8.img for Pi 3/4, kernel_2712.img for Pi 5).
+kernel=Image
 arm_64bit=1
 
 # Fast, quiet boot (BOOT-004, BOOT-007).
@@ -11,21 +15,19 @@ boot_delay=0
 disable_splash=1
 disable_overscan=1
 
-# Kernel names per SoC family (OS-002).
-# BCM2837 and BCM2711 use kernel8.img; BCM2712 uses kernel_2712.img.
-kernel=kernel8.img
-
 # KMS display driver (DRM for chalkboard-render, and HDMI-CEC).
 dtoverlay=vc4-kms-v3d
 
 # Serial console enabled for headless debugging and testing.
 enable_uart=1
 dtoverlay=miniuart-bt
+uart_2ndstage=1
 
 [pi4]
 start_file=start4.elf
 fixup_file=fixup4.dat
-kernel=kernel8.img
+# Kernel names per SoC family (OS-002: kernel8.img for Pi 3/4, kernel_2712.img for Pi 5).
+kernel=Image
 
 [pi5]
 kernel=kernel_2712.img

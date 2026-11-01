@@ -81,6 +81,7 @@ kernel_and_dtbs_to() { # <dir> <cmdline_content>
   mkdir -p "$1"
   # Support universal kernel names (OS-002)
   if [[ -f "${BINARIES_DIR}/Image" ]]; then
+    cp "${BINARIES_DIR}/Image" "$1/Image"
     cp "${BINARIES_DIR}/Image" "$1/kernel8.img"
     cp "${BINARIES_DIR}/Image" "$1/kernel_2712.img"
   fi
@@ -103,19 +104,19 @@ fi
 eeprom_to "$d"
 vfat "${BINARIES_DIR}/autoboot.vfat" 16 AUTOBOOT "$d"
 
-# 3. Build Partition 2: BOOT_A (FAT32, 64 MiB)
+# 3. Build Partition 2: BOOT_A (FAT32, 128 MiB)
 d="$work/boot-a"
 firmware_to "$d"
 cp "$board_dir/config.txt" "$d/config.txt"
 kernel_and_dtbs_to "$d" "$(cmdline_for_slot a /dev/mmcblk0p5)"
-vfat "${BINARIES_DIR}/boot-a.vfat" 64 BOOT_A "$d"
+vfat "${BINARIES_DIR}/boot-a.vfat" 128 BOOT_A "$d"
 
-# 4. Build Partition 3: BOOT_B (FAT32, 64 MiB)
+# 4. Build Partition 3: BOOT_B (FAT32, 128 MiB)
 d="$work/boot-b"
 firmware_to "$d"
 cp "$board_dir/config.txt" "$d/config.txt"
 kernel_and_dtbs_to "$d" "$(cmdline_for_slot b /dev/mmcblk0p6)"
-vfat "${BINARIES_DIR}/boot-b.vfat" 64 BOOT_B "$d"
+vfat "${BINARIES_DIR}/boot-b.vfat" 128 BOOT_B "$d"
 
 # 5. Build Initial Data Partition: DATA (128 MiB)
 data_img="${BINARIES_DIR}/data.f2fs"
