@@ -59,7 +59,7 @@ vfat() { # <image> <size in MiB> <label> <source dir>
 firmware_to() { # <dir>
   mkdir -p "$1"
   if [[ -d "$fw" ]]; then
-    for f in start.elf fixup.dat start4.elf fixup4.dat; do
+    for f in bootcode.bin start.elf fixup.dat start4.elf fixup4.dat; do
       if [[ -f "$fw/$f" ]]; then
         cp "$fw/$f" "$1/"
       fi
@@ -97,6 +97,9 @@ kernel_and_dtbs_to() { # <dir> <cmdline_content>
 d="$work/autoboot"
 mkdir -p "$d"
 printf '[all]\ntryboot_a_b=1\nboot_partition=2\n[tryboot]\nboot_partition=3\n' > "$d/autoboot.txt"
+if [[ -f "$fw/bootcode.bin" ]]; then
+  cp "$fw/bootcode.bin" "$d/"
+fi
 eeprom_to "$d"
 vfat "${BINARIES_DIR}/autoboot.vfat" 16 AUTOBOOT "$d"
 

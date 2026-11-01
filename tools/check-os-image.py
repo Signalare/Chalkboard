@@ -133,7 +133,7 @@ def check_mbr_image(image_path: Path) -> list[str]:
     for i in range(4):
         offset = 446 + i * 16
         entry = mbr[offset : offset + 16]
-        status, _, _, _, p_type, _, _, _, lba_start, num_sectors = struct.unpack(
+        status, _chs_start, p_type, _chs_end, lba_start, num_sectors = struct.unpack(
             "<B3sB3sII", entry
         )
         if p_type != 0:

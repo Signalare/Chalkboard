@@ -281,11 +281,14 @@ def cmd_reflash(args) -> None:
             self.send_header("Content-Length", str(size))
             self.end_headers()
             with open(image, "rb") as f:
+                sent = 0
                 while chunk := f.read(1 << 20):
                     self.wfile.write(chunk)
+                    sent += len(chunk)
+                self.wfile.flush()
 
         def log_message(self, fmt, *a):
-            print(f"  http: {self.client_address[0]} {fmt % a}")
+            print(f"  http: {self.client_address[0]} {fmt % a}", flush=True)
 
     ser = Serial(serial_port())
     spike_ip = None
