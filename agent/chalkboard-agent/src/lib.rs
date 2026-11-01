@@ -7,6 +7,7 @@ pub use chalkboard_board as board;
 pub use chalkboard_template as template;
 
 pub mod builder;
+pub mod cec;
 pub mod http;
 pub mod ipc;
 pub mod store;

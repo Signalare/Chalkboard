@@ -107,6 +107,7 @@ version = "0.0.0"
 dependencies = [
  "chalkboard-board",
  "chalkboard-template",
+ "libc",
  "rusqlite",
  "serde",
  "serde_json",

@@ -13,6 +13,7 @@ use std::thread::{self, JoinHandle};
 use serde::Deserialize;
 
 use crate::builder::SnapshotBuilder;
+use crate::cec::CecService;
 use crate::ipc::RendererClient;
 use crate::store::{Category, Item, Page, Screen, Store, Template};
 
@@ -27,6 +28,12 @@ struct SoldOutPayload {
 struct AnnouncementPayload {
     text: String,
     visible: bool,
+}
+
+/// Power control payload for HDMI-CEC endpoints (CEC-005).
+#[derive(Debug, Deserialize)]
+struct CecPowerPayload {
+    action: String,
 }
 
 /// Embedded HTTP server for agent REST API and web UI.
@@ -44,6 +51,7 @@ impl HttpServer {
         snapshots_root: impl Into<PathBuf>,
         web_dist_dir: impl Into<PathBuf>,
         ipc_client: Option<RendererClient>,
+        cec_service: Option<CecService>,
     ) -> std::io::Result<Self> {
         let listener = TcpListener::bind(bind_addr)?;
         let local_addr = listener.local_addr()?;
@@ -54,6 +62,7 @@ impl HttpServer {
         let snapshots_root = snapshots_root.into();
         let web_dist_dir = web_dist_dir.into();
         let ipc_client = Arc::new(ipc_client);
+        let cec_service = Arc::new(cec_service);
 
         let handle = thread::spawn(move || {
             while running_clone.load(Ordering::SeqCst) {
@@ -63,6 +72,7 @@ impl HttpServer {
                         let snap_root = snapshots_root.clone();
                         let dist_dir = web_dist_dir.clone();
                         let ipc = ipc_client.clone();
+                        let cec = cec_service.clone();
                         thread::spawn(move || {
                             if let Ok(reader) = stream.try_clone() {
                                 let _ = Self::handle_connection(
@@ -72,6 +82,7 @@ impl HttpServer {
                                     &snap_root,
                                     &dist_dir,
                                     ipc.as_ref().as_ref(),
+                                    cec.as_ref().as_ref(),
                                 );
                             }
                         });
@@ -102,6 +113,7 @@ impl HttpServer {
         snapshots_root: &Path,
         web_dist_dir: &Path,
         ipc_client: Option<&RendererClient>,
+        cec_service: Option<&CecService>,
     ) -> std::io::Result<()> {
         let mut reader = BufReader::new(reader);
         let mut request_line = String::new();
@@ -158,12 +170,14 @@ impl HttpServer {
                 &store,
                 snapshots_root,
                 ipc_client,
+                cec_service,
             )
         } else {
             Self::serve_static(&mut writer, method, uri, web_dist_dir)
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn route_api<W: Write>(
         writer: &mut W,
         method: &str,
@@ -172,6 +186,7 @@ impl HttpServer {
         store: &Store,
         snapshots_root: &Path,
         ipc_client: Option<&RendererClient>,
+        cec_service: Option<&CecService>,
     ) -> std::io::Result<()> {
         let path = uri.split('?').next().unwrap_or(uri);
 
@@ -346,6 +361,52 @@ impl HttpServer {
                     "hash": hash,
                 });
                 Self::send_json(writer, 200, &json.to_string())
+            }
+
+            ("GET", "/api/v1/cec/status") => {
+                let status = if let Some(cec) = cec_service {
+                    cec.get_status()
+                } else {
+                    let mock = CecService::new_mock("Chalkboard");
+                    mock.get_status()
+                };
+                let json = serde_json::to_string(&status).unwrap_or_else(|_| "{}".to_string());
+                Self::send_json(writer, 200, &json)
+            }
+
+            ("POST", "/api/v1/cec/power") => {
+                if let Ok(p) = serde_json::from_slice::<CecPowerPayload>(body) {
+                    if let Some(cec) = cec_service {
+                        match p.action.as_str() {
+                            "on" => {
+                                cec.power_on().map_err(std::io::Error::other)?;
+                            }
+                            "standby" => {
+                                cec.standby().map_err(std::io::Error::other)?;
+                            }
+                            "active-source" => {
+                                cec.assert_active_source().map_err(std::io::Error::other)?;
+                            }
+                            other => {
+                                let err = format!(r#"{{"error":"unknown cec action: {other}"}}"#);
+                                return Self::send_json(writer, 400, &err);
+                            }
+                        }
+                        let current_power = cec
+                            .query_power_status()
+                            .unwrap_or(crate::cec::PowerStatus::Unknown);
+                        let res = serde_json::json!({
+                            "status": "ok",
+                            "action": p.action,
+                            "power_status": current_power,
+                        });
+                        Self::send_json(writer, 200, &res.to_string())
+                    } else {
+                        Self::send_json(writer, 200, r#"{"status":"ok","action":"noop"}"#)
+                    }
+                } else {
+                    Self::send_json(writer, 400, r#"{"error":"invalid cec power payload"}"#)
+                }
             }
 
             _ => {

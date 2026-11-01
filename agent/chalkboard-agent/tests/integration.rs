@@ -379,6 +379,7 @@ fn web_001_web_007_http_api_endpoints() {
             &snapshots_root,
             &web_dist,
             None,
+            None,
         )
         .unwrap();
 
@@ -444,6 +445,135 @@ fn web_001_web_007_http_api_endpoints() {
     let (code, body) = send_req("GET", "/", "");
     assert_eq!(code, 200);
     assert!(body.contains("Chalkboard"));
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn cec_001_cec_006_mock_adapter_and_api() {
+    use chalkboard_agent::cec::{
+        CecAdapter, CecError, CecMessage, CecService, LOG_ADDR_PLAYBACK_1, LOG_ADDR_TV,
+        MockCecAdapter, PowerStatus,
+    };
+
+    // 1. In-memory Mock Adapter test harness functionality (#25)
+    let mock = MockCecAdapter::new("mock-cec0", LOG_ADDR_PLAYBACK_1, [0x10, 0x00], "FrontDesk");
+    assert_eq!(mock.osd_name(), "FrontDesk");
+    assert_eq!(mock.query_power_status().unwrap(), PowerStatus::Standby);
+    assert!(!mock.is_active_source());
+
+    // Transmit Image View On (0x04) directly
+    let img_on = CecMessage::image_view_on(LOG_ADDR_PLAYBACK_1, LOG_ADDR_TV);
+    mock.transmit(&img_on).unwrap();
+    assert_eq!(mock.query_power_status().unwrap(), PowerStatus::On);
+
+    // Transmit Active Source (0x82)
+    let active = CecMessage::active_source(LOG_ADDR_PLAYBACK_1, [0x10, 0x00]);
+    mock.transmit(&active).unwrap();
+    assert!(mock.is_active_source());
+
+    // Transmit Standby (0x36)
+    let standby = CecMessage::standby(LOG_ADDR_PLAYBACK_1, LOG_ADDR_TV);
+    mock.transmit(&standby).unwrap();
+    assert_eq!(mock.query_power_status().unwrap(), PowerStatus::Standby);
+    assert!(!mock.is_active_source());
+
+    // OSD name truncation (CEC-002: ≤ 14 ASCII chars)
+    mock.set_osd_name("Counter Display Terminal 1").unwrap();
+    assert_eq!(mock.osd_name(), "Counter Displa");
+
+    // Failure injection (NACK & Timeout)
+    mock.set_simulate_nack(true);
+    assert_eq!(mock.transmit(&img_on), Err(CecError::TransmitNack));
+    mock.set_simulate_nack(false);
+
+    mock.set_simulate_timeout(true);
+    assert_eq!(mock.transmit(&img_on), Err(CecError::TransmitTimeout));
+    mock.set_simulate_timeout(false);
+
+    // 2. High-level CecService coordinator
+    let cec_service = CecService::new_mock("Chalkboard");
+    let status = cec_service.get_status();
+    assert!(status.enabled);
+    assert!(status.is_mock);
+    assert_eq!(status.primary_power, PowerStatus::Standby);
+
+    cec_service.power_on().unwrap();
+    let status = cec_service.get_status();
+    assert_eq!(status.primary_power, PowerStatus::On);
+    assert!(status.active_source);
+
+    cec_service.standby().unwrap();
+    let status = cec_service.get_status();
+    assert_eq!(status.primary_power, PowerStatus::Standby);
+
+    // 3. HTTP REST API integration via HttpServer
+    let tmp = make_temp_dir("http-cec");
+    let db_path = tmp.join("chalkboard.db");
+    let snapshots_root = tmp.join("snapshots");
+    let web_dist = tmp.join("dist");
+    fs::create_dir_all(&web_dist).unwrap();
+    fs::write(web_dist.join("index.html"), "<html>Chalkboard</html>").unwrap();
+
+    let store = Store::open(&db_path, None).unwrap();
+
+    let send_req = |method: &str, path: &str, body: &str| -> (u16, String) {
+        let req = format!(
+            "{method} {path} HTTP/1.1\r\n\
+             Host: localhost\r\n\
+             Content-Type: application/json\r\n\
+             Content-Length: {}\r\n\
+             Connection: close\r\n\
+             \r\n\
+             {body}",
+            body.len()
+        );
+        let mut writer = Vec::new();
+        chalkboard_agent::http::HttpServer::handle_connection(
+            req.as_bytes(),
+            &mut writer,
+            store.clone(),
+            &snapshots_root,
+            &web_dist,
+            None,
+            Some(&cec_service),
+        )
+        .unwrap();
+
+        let resp = String::from_utf8(writer).unwrap();
+        let status_code: u16 = resp
+            .lines()
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .nth(1)
+            .unwrap()
+            .parse()
+            .unwrap();
+        let body = resp.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+        (status_code, body)
+    };
+
+    // GET /api/v1/cec/status
+    let (code, body) = send_req("GET", "/api/v1/cec/status", "");
+    assert_eq!(code, 200);
+    assert!(body.contains("\"is_mock\":true"));
+
+    // POST /api/v1/cec/power {"action":"on"}
+    let (code, body) = send_req("POST", "/api/v1/cec/power", r#"{"action":"on"}"#);
+    assert_eq!(code, 200);
+    assert!(body.contains("\"power_status\":\"on\""));
+
+    // Verify GET /api/v1/cec/status updated
+    let (code, body) = send_req("GET", "/api/v1/cec/status", "");
+    assert_eq!(code, 200);
+    assert!(body.contains("\"primary_power\":\"on\""));
+    assert!(body.contains("\"active_source\":true"));
+
+    // POST /api/v1/cec/power {"action":"standby"}
+    let (code, body) = send_req("POST", "/api/v1/cec/power", r#"{"action":"standby"}"#);
+    assert_eq!(code, 200);
+    assert!(body.contains("\"power_status\":\"standby\""));
 
     let _ = fs::remove_dir_all(&tmp);
 }

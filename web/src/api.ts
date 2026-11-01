@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-import type { Category, Item, NodeStatus, Page, Screen, Template } from './types';
+import type { Category, CecStatus, Item, NodeStatus, Page, Screen, Template } from './types';
 
 const API_BASE = '/api/v1';
 
@@ -99,6 +99,19 @@ export const api = {
   publish(): Promise<{ status: string; hash: string }> {
     return request<{ status: string; hash: string }>('/publish', {
       method: 'POST',
+    });
+  },
+
+  getCecStatus(): Promise<CecStatus> {
+    return request<CecStatus>('/cec/status');
+  },
+
+  sendCecPower(
+    action: 'on' | 'standby' | 'active-source',
+  ): Promise<{ status: string; action: string; power_status?: string }> {
+    return request<{ status: string; action: string; power_status?: string }>('/cec/power', {
+      method: 'POST',
+      body: JSON.stringify({ action }),
     });
   },
 };

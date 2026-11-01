@@ -65,3 +65,21 @@ export interface NodeStatus {
     visible: boolean;
   };
 }
+
+export interface CecAdapterStatus {
+  device: string;
+  logical_address: number;
+  physical_address: string;
+  power_status: 'on' | 'standby' | 'transitioning-to-on' | 'transitioning-to-standby' | 'unknown';
+  active_source: boolean;
+  osd_name: string;
+  is_mock: boolean;
+}
+
+export interface CecStatus {
+  enabled: boolean;
+  is_mock: boolean;
+  primary_power: string;
+  active_source: boolean;
+  adapters: CecAdapterStatus[];
+}
